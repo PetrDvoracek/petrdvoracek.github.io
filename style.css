@@ -50,6 +50,22 @@ a:hover {
     text-decoration: underline;
 }
 
+/* Retro 2000s rainbow text effect */
+.rainbow {
+    animation: rainbow 5s linear infinite;
+    font-weight: 600;
+}
+
+@keyframes rainbow {
+    0%   { color: #ff0000; }
+    17%  { color: #ff8000; }
+    33%  { color: #ffff00; }
+    50%  { color: #00ff00; }
+    67%  { color: #0080ff; }
+    83%  { color: #8000ff; }
+    100% { color: #ff0000; }
+}
+
 /* Header / Intro */
 header {
     display: flex;
@@ -315,6 +331,70 @@ article a {
 
 article a:hover {
     text-decoration-thickness: 2px;
+}
+
+/* Page title (for blog.html etc) */
+.page-title {
+    font-size: 2rem;
+    margin-bottom: 2rem;
+}
+
+/* Blog list */
+.blog-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.blog-item {
+    display: block;
+    padding: 1.25rem;
+    background: var(--bg-alt);
+    border-radius: 8px;
+    color: inherit;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.blog-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    text-decoration: none;
+}
+
+@media (prefers-color-scheme: dark) {
+    .blog-item:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+}
+
+.blog-item time {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.25rem;
+}
+
+.blog-item h2 {
+    font-size: 1.15rem;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.blog-item p {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+}
+
+.empty-state {
+    color: var(--text-secondary);
+    font-style: italic;
+    margin: 2rem 0;
+}
+
+.blog-list:has(.blog-item) + .empty-state {
+    display: none;
 }
 
 /* Responsive */
