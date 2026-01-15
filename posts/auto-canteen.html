@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Automatic Canteen Checkout - Few-shot food recognition system for daily-changing menus">
+    <title>Automatic Canteen Checkout | Petr Dvořáček</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <a href="../index.html" class="back">Back to home</a>
+
+    <article>
+        <h1>Automatic Canteen Checkout</h1>
+        <p class="meta">Computer Vision · Few-Shot Learning</p>
+
+        <!-- TODO: Write your blog post content here -->
+
+        <h2>The Problem</h2>
+        <p>
+            To increase checkout speed in a company canteen, I have developed a core computer vision algotithm for automatic food item recognition. The main challenge was the daily-changing menu, requiring a flexible few-shot detection approach that could adapt to new food items with minimal examples.
+        </p>
+
+        <h2>Approach</h2>
+        <p>
+            Using triplet loss together with hard-negative mining, I trained a convolutional neural network to produce embeddings for food item images. Every day, one image for each item in the menu was captured by the canteen staff. These images were used to create a reference database of embeddings. When a customer places their tray at checkout, the system captures an image of the tray, extracts embeddings for each visible food item, and compares them to the stored embeddings using nearest-neighbor search to identify each item.
+        </p>
+
+        <h2>What I Learned</h2>
+        <p>
+            Same as in <a href="brain-atlas.html">Brain Atlas from MRI Scans</a>, energy-based models got your back. The management was surprised that the computer vision algorithm can be <em>that</em> flexible.
+        </p>
+    </article>
+
+    <footer>
+        <a href="../index.html">← Back to home</a>
+    </footer>
+</body>
+</html>

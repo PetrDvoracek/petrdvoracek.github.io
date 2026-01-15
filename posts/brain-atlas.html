@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Brain Atlas from MRI Scans - Deep learning for semantic segmentation of brain structures">
+    <title>Brain Atlas from MRI Scans | Petr Dvořáček</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <a href="../index.html" class="back">Back to home</a>
+
+    <article>
+        <h1>Brain Atlas from MRI Scans</h1>
+        <p class="meta">University of Ostrava · 2022–Present</p>
+
+        <!-- TODO: Write your blog post content here -->
+
+        <h2>The Problem</h2>
+        <p>
+            Deep learning-enhanced visualisation has been used in medical imaging for many years. Developing a model capable of precise segmentation of brain structures from MRI scans requires many labelled images. Producing these labels requires a radiology expert to manually mark the structures—a time-consuming and expensive process. Our team at IRAFM, University of
+        Ostrava, developed a deep learning model that generalises from a single labelled sample to many unlabelled samples by leveraging an MRI brain atlas.
+        </p>
+
+        <h2>Approach</h2>
+        <p>
+            We took 3D MRI brain scans from several people. Then we trained a neural network that, given a random 2D slice, could output precise coordinates indicating where in the brain the slice is located. The task couldn't be solved with simple regression because the origin of the DICOM coordinate system is arbitrary and differs between scans. Some radiologists set the origin to the nose, some to the chin, others to the eyebrows. That was a problem. We didn't have absolute positions, but we did have relative positions between different scans from the same person. To solve this, we designed a loss function that estimates relative positions between scans rather than absolute positions, based on <a href="https://www.youtube.com/watch?v=xIn-Czj1g2Q&list=PLgF7i4LH-YxacgG0OPmTYe1UUQAvcw9Ke&index=10"> energy minimisation principles</a>.
+        </p>
+        <p>
+            This allowed us to align all the scans into a common coordinate system. Once aligned, we could use a single labelled scan (we actually only had one) to propagate the labels to all other scans, creating a large labelled dataset for training a segmentation model. We then trained a U-Net-style convolutional neural network on this dataset to perform semantic
+        segmentation of brain structures. The transferred labels weren't perfect, but having imperfect data is still better than having no data at all. Noisy labels can be handled by an appropriate loss function, for example <a href="https://gitlab.com/irafm-ai/clipping_cross_entropy">binary cross-entropy with dynamical clipping</a>, generalised for segmentation.
+        </p>
+
+        <h2>What I Learned</h2>
+        <p>
+            As a computer vision researcher, you often face data scarcity, especially in specialised domains like medical imaging. Be creative, think outside the box. Energy-based models and loss functions are advanced training techniques that can help you solve problems that seem unsolvable at first glance.
+        </p>
+
+        <!-- <h2>Results</h2>
+        <p>
+            [Share outcomes: accuracy metrics, comparison with baselines,
+            visualizations of segmentation results]
+        </p> -->
+
+    </article>
+
+    <footer>
+        <a href="../index.html">← Back to home</a>
+    </footer>
+</body>
+</html>
