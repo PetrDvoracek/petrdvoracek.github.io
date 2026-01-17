@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Why pandas .loc[] can be surprisingly slow and what to use instead">
+    <meta name="description" content="Why pandas .loc[] can be surprisingly slow and what to use instead. Benchmarks comparing loc, at, iloc, iat vs plain dict.">
     <title>The Hidden Performance Trap in pandas.loc[] | Petr Dvořáček</title>
     <link rel="canonical" href="https://petrdvoracek.github.io/blog/pandas-loc-performance.html">
 
     <!-- Open Graph -->
     <meta property="og:title" content="The Hidden Performance Trap in pandas.loc[]">
-    <meta property="og:description" content="Why pandas .loc[] can be surprisingly slow and what to use instead. Benchmarks show 37x speedup with numpy.">
+    <meta property="og:description" content="Why pandas .loc[] can be surprisingly slow and what to use instead. Benchmarks show 4-24x speedup with plain dict.">
     <meta property="og:type" content="article">
     <meta property="og:url" content="https://petrdvoracek.github.io/blog/pandas-loc-performance.html">
 
@@ -30,10 +30,15 @@
         <h1>The Hidden Performance Trap in pandas.loc[]</h1>
         <p class="meta">January 16, 2026</p>
 
+        <blockquote class="pull-quote">
+            Stop using pandas <code>.loc[]</code>. Please.
+        </blockquote>
+
         <p>
-            If you work with pandas, you've probably used <code>.loc[]</code> thousands of times.
-            It's the recommended way to access data by labels, and every tutorial teaches it.
-            But there's a performance trap that can make your code 1000x slower than it needs to be.
+            Recently I have came across a production code where pandas' <code>.loc[]</code> was
+            being used in a tight loop to access single values repeatedly. The performance was,
+            unsurprisingly, poor. That is counter intuitive, since you have set the dataframe to
+            index by the lookup key, so accessing a value by that key should be fast, right? Wrong.
         </p>
 
         <h2>The Problem</h2>
@@ -43,14 +48,7 @@
             you're not even using. For scalar access, this is wasteful.
         </p>
 
-        <p>
-            Even worse: when working with non-unique indexes, pandas switches between algorithms
-            based on a hardcoded threshold. Query 4 indexes? Fast. Query 5? Suddenly 1000x slower.
-            This was <a href="https://github.com/pandas-dev/pandas/issues/54550">reported as a bug</a>
-            and stems from a conservative optimization threshold in the codebase.
-        </p>
-
-        <h2>Benchmark: loc vs at vs iat vs iloc</h2>
+        <h2>Benchmark: loc vs at vs iat vs iloc vs dictionary</h2>
         <p>
             Here's a simple benchmark you can run yourself. We'll access a single cell 10,000 times
             using different methods:
@@ -58,80 +56,101 @@
 
         <pre><code>import pandas as pd
 import numpy as np
+import random
 import time
 
-# Create a DataFrame with 100k rows
-n_rows = 100_000
-df = pd.DataFrame({
-    'A': np.random.randn(n_rows),
-    'B': np.random.randn(n_rows),
-    'C': np.random.randn(n_rows)
-})
+NUM_ITEMS = 10_000_000
+NUM_LOOKUPS = 10_000
+num_classes = 10
 
-n_iterations = 10_000
-row_idx = 50_000
+# Create test data: each img_X maps to a random class
+data = {
+    f"img_{i}": np.random.randint(num_classes)
+    for i in range(NUM_ITEMS)
+}
+keys = list(data.keys())
 
-# Benchmark .loc[]
+# Create DataFrame with same data
+# Indexed by img_X keys - should be fast, right?
+df = pd.DataFrame(
+    {"value": data.values()},
+    index=data.keys()
+)
+
+# Generate random queries for lookup
+lookup_keys = [
+    random.choice(keys) for _ in range(NUM_LOOKUPS)
+]
+lookup_indices = [
+    random.randint(0, NUM_ITEMS - 1)
+    for _ in range(NUM_LOOKUPS)
+]
+
+# Benchmark: dict lookup
 start = time.perf_counter()
-for _ in range(n_iterations):
-    _ = df.loc[row_idx, 'A']
+for key in lookup_keys:
+    _ = data[key]
+dict_time = time.perf_counter() - start
+
+# Benchmark: pandas .loc lookup (label-based)
+start = time.perf_counter()
+for key in lookup_keys:
+    _ = df.loc[key, "value"]
 loc_time = time.perf_counter() - start
 
-# Benchmark .iloc[]
+# Benchmark: pandas .at lookup (scalar)
 start = time.perf_counter()
-for _ in range(n_iterations):
-    _ = df.iloc[row_idx, 0]
-iloc_time = time.perf_counter() - start
-
-# Benchmark .at[]
-start = time.perf_counter()
-for _ in range(n_iterations):
-    _ = df.at[row_idx, 'A']
+for key in lookup_keys:
+    _ = df.at[key, "value"]
 at_time = time.perf_counter() - start
 
-# Benchmark .iat[]
+# Benchmark: pandas .iloc lookup (position-based)
 start = time.perf_counter()
-for _ in range(n_iterations):
-    _ = df.iat[row_idx, 0]
+for idx in lookup_indices:
+    _ = df.iloc[idx, 0]
+iloc_time = time.perf_counter() - start
+
+# Benchmark: pandas .iat lookup (scalar)
+start = time.perf_counter()
+for idx in lookup_indices:
+    _ = df.iat[idx, 0]
 iat_time = time.perf_counter() - start
 
-# Benchmark direct numpy access
-arr = df['A'].values
-start = time.perf_counter()
-for _ in range(n_iterations):
-    _ = arr[row_idx]
-numpy_time = time.perf_counter() - start
-
-print(f"loc:  {loc_time:.3f}s")
-print(f"iloc: {iloc_time:.3f}s")
-print(f"at:   {at_time:.3f}s")
-print(f"iat:  {iat_time:.3f}s")
-print(f"numpy:  {numpy_time:.3f}s")
-print()
-print(f"at is {loc_time/at_time:.1f}x faster than loc")
-print(f"iat is {iloc_time/iat_time:.1f}x faster than iloc")
-print(f"numpy is {loc_time/numpy_time:.0f}x faster than loc")</code></pre>
+# Results
+print(f"dict:  {dict_time:.4f}s")
+print(f"loc:   {loc_time:.4f}s")
+print(f"at:    {at_time:.4f}s")
+print(f"iloc:  {iloc_time:.4f}s")
+print(f"iat:   {iat_time:.4f}s")</code></pre>
 
         <h2>Typical Results</h2>
         <p>
             Running this on Macbook Pro M4 (pandas 2.x, Python 3.11):
         </p>
 
-        <pre><code>loc:  0.033s
-iloc: 0.064s
-at:   0.012s
-iat:  0.057s
-numpy:  0.001s
-
-at is 2.8x faster than loc
-iat is 1.1x faster than iloc
-numpy is 37x faster than loc</code></pre>
+        <pre><code>dict:  0.0033s
+loc:   0.0795s  ( 24.4x slower than dict)
+at:    0.0142s  (  4.4x slower than dict)
+iloc:  0.0556s  ( 17.1x slower than dict)
+iat:   0.0399s  ( 12.3x slower than dict)</code></pre>
 
         <p>
-            The difference is stark. For single-value access, <code>.at[]</code> and <code>.iat[]</code>
-            are 1-3x faster than their <code>.loc[]</code>/<code>.iloc[]</code> counterparts.
-            Direct numpy access is 37x faster.
+            The difference is stark. With 10 million rows, <code>.loc[]</code> is dramatically
+            slower than everything else &ndash; over 24x slower than a plain dict. Even
+            <code>.at[]</code>, the fastest pandas accessor, is still 4x slower than dict.
+            The position-based methods (<code>.iloc[]</code>, <code>.iat[]</code>) fall
+            somewhere in between.
         </p>
+
+        <p>
+            <strong>A note on vectorization:</strong> The production code I encountered genuinely
+            required element-wise lookups &ndash; it was embedded in dataset iterator. But more
+            often than not, what looks like a loop can be rewritten
+            as a vectorized operation, which will be orders of magnitude faster than any
+            element-wise approach.
+        </p>
+
+        
 
         <h2>Why This Happens</h2>
         <p>
@@ -155,29 +174,17 @@ numpy is 37x faster than loc</code></pre>
             Use the right tool for the job:
         </p>
         <ul>
-            <li><strong><code>.at[row, col]</code></strong> for single scalar by label (fast)</li>
-            <li><strong><code>.iat[row_idx, col_idx]</code></strong> for single scalar by position (fastest)</li>
+            <li><strong>Plain dict</strong> for key-value lookups in loops (fastest)</li>
+            <li><strong><code>.at[row, col]</code></strong> for single scalar by label if you must use pandas</li>
             <li><strong><code>.loc[]</code></strong> for slices, boolean masks, or multi-row/column access</li>
-            <li><strong>Direct numpy: <code>df['col'].values[idx]</code></strong> when you need maximum speed</li>
+            <li><strong><code>.iloc[]</code>/<code>.iat[]</code></strong> for position-based access (but note they're slower than label-based)</li>
         </ul>
-        <p>
-            But the real lesson is broader: <strong>avoid element-wise loops entirely</strong>.
-            If you're calling any accessor 10,000 times in a loop, you're doing it wrong.
-            Vectorized operations are always the answer.
-        </p>
-
-        <pre><code># Bad: element-wise loop
-for i in range(len(df)):
-    df.at[i, 'D'] = df.at[i, 'A'] * 2
-
-# Good: vectorized
-df['D'] = df['A'] * 2</code></pre>
 
         <h2>Takeaways</h2>
         <ul>
-            <li>For single-value access: <code>.at[]</code> and <code>.iat[]</code> over <code>.loc[]</code> and <code>.iloc[]</code></li>
+            <li>For key-value lookups in loops: use a plain dict (4-24x faster than pandas)</li>
+            <li>If you must use pandas for scalar access: <code>.at[]</code> over <code>.loc[]</code></li>
             <li>For bulk operations: always vectorize</li>
-            <li>For maximum speed: drop down to numpy</li>
             <li>Profile before optimizing &ndash; the bottleneck is rarely where you think</li>
         </ul>
 

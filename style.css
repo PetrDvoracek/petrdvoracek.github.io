@@ -192,6 +192,49 @@ h2 {
     font-size: 0.95rem;
 }
 
+.experience-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    margin-bottom: 0.75rem;
+}
+
+/* Expandable experience section */
+.more-experience {
+    margin-top: 1.25rem;
+}
+
+.more-experience summary {
+    cursor: pointer;
+    color: var(--accent);
+    font-size: 0.95rem;
+    font-weight: 600;
+    padding: 0.5rem 0;
+    list-style: none;
+}
+
+.more-experience summary::-webkit-details-marker {
+    display: none;
+}
+
+.more-experience summary::before {
+    content: "+ ";
+}
+
+.more-experience[open] summary::before {
+    content: "− ";
+}
+
+.more-experience summary:hover {
+    text-decoration: underline;
+}
+
+.more-experience .experience-item:first-of-type {
+    margin-top: 1rem;
+}
+
 /* Publications */
 .publications {
     list-style: none;
@@ -271,6 +314,21 @@ article > .meta {
     color: var(--text-secondary);
     font-size: 0.95rem;
     margin-bottom: 2.5rem;
+}
+
+.pull-quote {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 1.4rem;
+    font-weight: 600;
+    font-style: italic;
+    color: var(--text);
+    border-left: 4px solid var(--accent);
+    padding: 0.5rem 0 0.5rem 1.25rem;
+    margin: 0 0 2rem 0;
+}
+
+.pull-quote code {
+    font-style: normal;
 }
 
 article h2 {
