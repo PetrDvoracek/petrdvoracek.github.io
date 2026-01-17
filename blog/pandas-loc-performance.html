@@ -128,15 +128,15 @@ print(f"iat:   {iat_time:.4f}s")</code></pre>
             Running this on Macbook Pro M4 (pandas 2.x, Python 3.11):
         </p>
 
-        <pre><code>dict:  0.0033s
-loc:   0.0795s  ( 24.4x slower than dict)
-at:    0.0142s  (  4.4x slower than dict)
-iloc:  0.0556s  ( 17.1x slower than dict)
-iat:   0.0399s  ( 12.3x slower than dict)</code></pre>
+        <pre><code>dict:  0.0036s
+loc:   1.9263s  (532.6x slower than dict)
+at:    0.0137s  (  3.8x slower than dict)
+iloc:  0.0532s  ( 14.7x slower than dict)
+iat:   0.0386s  ( 10.7x slower than dict)</code></pre>
 
         <p>
             The difference is stark. With 10 million rows, <code>.loc[]</code> is dramatically
-            slower than everything else &ndash; over 24x slower than a plain dict. Even
+            slower than everything else &ndash; over 533x slower than a plain dict. Even
             <code>.at[]</code>, the fastest pandas accessor, is still 4x slower than dict.
             The position-based methods (<code>.iloc[]</code>, <code>.iat[]</code>) fall
             somewhere in between.
