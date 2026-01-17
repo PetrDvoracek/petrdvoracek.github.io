@@ -381,6 +381,129 @@ article pre code {
     padding: 0;
 }
 
+/* Python syntax highlighting (highlight.js compatible) */
+.hljs {
+    background: var(--bg-alt);
+    color: var(--text);
+}
+
+/* Comments */
+.hljs-comment,
+.hljs-quote {
+    color: #6a737d;
+    font-style: italic;
+}
+
+/* Keywords: def, class, if, else, for, while, return, import, etc. */
+.hljs-keyword,
+.hljs-selector-tag {
+    color: #d73a49;
+}
+
+@media (prefers-color-scheme: dark) {
+    .hljs-keyword,
+    .hljs-selector-tag {
+        color: #ff7b72;
+    }
+    .hljs-comment,
+    .hljs-quote {
+        color: #8b949e;
+    }
+}
+
+/* Strings */
+.hljs-string,
+.hljs-doctag,
+.hljs-regexp {
+    color: #032f62;
+}
+
+@media (prefers-color-scheme: dark) {
+    .hljs-string,
+    .hljs-doctag,
+    .hljs-regexp {
+        color: #a5d6ff;
+    }
+}
+
+/* Numbers */
+.hljs-number,
+.hljs-literal {
+    color: #005cc5;
+}
+
+@media (prefers-color-scheme: dark) {
+    .hljs-number,
+    .hljs-literal {
+        color: #79c0ff;
+    }
+}
+
+/* Built-in functions and types */
+.hljs-built_in,
+.hljs-type {
+    color: #6f42c1;
+}
+
+@media (prefers-color-scheme: dark) {
+    .hljs-built_in,
+    .hljs-type {
+        color: #d2a8ff;
+    }
+}
+
+/* Function/method names */
+.hljs-title,
+.hljs-function {
+    color: #6f42c1;
+}
+
+@media (prefers-color-scheme: dark) {
+    .hljs-title,
+    .hljs-function {
+        color: #d2a8ff;
+    }
+}
+
+/* Variables and attributes */
+.hljs-attr,
+.hljs-variable,
+.hljs-template-variable {
+    color: #e36209;
+}
+
+@media (prefers-color-scheme: dark) {
+    .hljs-attr,
+    .hljs-variable,
+    .hljs-template-variable {
+        color: #ffa657;
+    }
+}
+
+/* Meta (decorators, etc.) */
+.hljs-meta {
+    color: #005cc5;
+}
+
+@media (prefers-color-scheme: dark) {
+    .hljs-meta {
+        color: #79c0ff;
+    }
+}
+
+/* Operators and punctuation */
+.hljs-symbol,
+.hljs-bullet {
+    color: #005cc5;
+}
+
+@media (prefers-color-scheme: dark) {
+    .hljs-symbol,
+    .hljs-bullet {
+        color: #79c0ff;
+    }
+}
+
 article a {
     text-decoration: underline;
     text-decoration-color: var(--accent);

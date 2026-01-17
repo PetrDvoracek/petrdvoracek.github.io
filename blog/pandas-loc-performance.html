@@ -22,6 +22,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="../style.css">
+
+    <!-- Syntax highlighting -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+    <script>document.addEventListener('DOMContentLoaded', () => hljs.highlightAll());</script>
 </head>
 <body>
     <a href="../blog.html" class="back">Back to blog</a>
@@ -31,60 +36,65 @@
         <p class="meta">January 16, 2026</p>
 
         <blockquote class="pull-quote">
-            Stop using pandas <code>.loc[]</code>. Please.
+            Stop using DataFrame.loc[...] for scalar lookups. Please.
         </blockquote>
 
         <p>
-            Recently I have came across a production code where pandas' <code>.loc[]</code> was
-            being used in a tight loop to access single values repeatedly. The performance was,
-            unsurprisingly, poor. That is counter intuitive, since you have set the dataframe to
-            index by the lookup key, so accessing a value by that key should be fast, right? Wrong.
+            Recently I came across production code where pandas' <code>.loc[]</code> was
+            being used in a tight loop to access rows repeatedly. The performance was,
+            unsurprisingly, poor. That's counterintuitive &ndash; if you've set the DataFrame index to
+            your lookup key, accessing a value by that key should be fast, right? Wrong.
         </p>
 
         <h2>The Problem</h2>
         <p>
             When accessing single values repeatedly, <code>.loc[]</code> carries significant overhead.
-            Each call must handle label lookup, type checking, and support for complex slicing operations
+            Each call handles label lookup, type checking, and complex slicing operations
             you're not even using. For scalar access, this is wasteful.
         </p>
 
-        <h2>Benchmark: loc vs at vs iat vs iloc vs dictionary</h2>
+        <h2>Benchmark: loc vs at vs iloc vs iat vs dict</h2>
         <p>
-            Here's a simple benchmark you can run yourself. We'll access a single cell 10,000 times
-            using different methods:
+            Here's a benchmark you can run yourself. It tests not only <code>.loc[]</code> but
+            also <code>.at[]</code>, <code>.iloc[]</code>, <code>.iat[]</code>, and plain Python <code>dict</code> lookups. <code>loc[]</code>
+             and <code>at[]</code> are string-based, while <code>iloc[]</code> and <code>iat[]</code> are position-based. 
+             Benchmark runs 10,000 random lookups on a DataFrame with 1 million rows:
         </p>
 
-        <pre><code>import pandas as pd
+        <pre><code class="language-python">import pandas as pd
 import numpy as np
 import random
 import time
 
-NUM_ITEMS = 10_000_000
+# Configuration
+NUM_ITEMS = 1_000_000
 NUM_LOOKUPS = 10_000
+
 num_classes = 10
 
-# Create test data: each img_X maps to a random class
+# Create test data, each img_X maps to a random class
 data = {
-    f"img_{i}": np.random.randint(num_classes)
-    for i in range(NUM_ITEMS)
-}
+    f"img_{i}": np.random.randint(num_classes) for i in range(NUM_ITEMS)
+    }
 keys = list(data.keys())
 
 # Create DataFrame with same data
-# Indexed by img_X keys - should be fast, right?
+# Data are indexed by img_X keys, this should be fast, right?
 df = pd.DataFrame(
     {"value": data.values()},
     index=data.keys()
-)
+    )
+# Warm-up access to avoid any lazy initialization overhead
+_ = df.loc[keys[0]]
+_ = df.at[keys[0], "value"]
+_ = df.iloc[0]
+_ = df.iat[0, 0]
 
 # Generate random queries for lookup
-lookup_keys = [
-    random.choice(keys) for _ in range(NUM_LOOKUPS)
-]
+lookup_keys = [random.choice(keys) for _ in range(NUM_LOOKUPS)]
 lookup_indices = [
-    random.randint(0, NUM_ITEMS - 1)
-    for _ in range(NUM_LOOKUPS)
-]
+    random.randint(0, NUM_ITEMS - 1) for _ in range(NUM_LOOKUPS)
+    ]
 
 # Benchmark: dict lookup
 start = time.perf_counter()
@@ -95,22 +105,22 @@ dict_time = time.perf_counter() - start
 # Benchmark: pandas .loc lookup (label-based)
 start = time.perf_counter()
 for key in lookup_keys:
-    _ = df.loc[key, "value"]
+    _ = df.loc[key]
 loc_time = time.perf_counter() - start
 
-# Benchmark: pandas .at lookup (scalar)
+# Benchmark: pandas .at lookup (label-based, scalar)
 start = time.perf_counter()
 for key in lookup_keys:
     _ = df.at[key, "value"]
 at_time = time.perf_counter() - start
 
-# Benchmark: pandas .iloc lookup (position-based)
+# Benchmark: pandas .iloc lookup (integer position-based)
 start = time.perf_counter()
 for idx in lookup_indices:
-    _ = df.iloc[idx, 0]
+    _ = df.iloc[idx]
 iloc_time = time.perf_counter() - start
 
-# Benchmark: pandas .iat lookup (scalar)
+# Benchmark: pandas .iat lookup (integer position-based, scalar)
 start = time.perf_counter()
 for idx in lookup_indices:
     _ = df.iat[idx, 0]
@@ -118,35 +128,39 @@ iat_time = time.perf_counter() - start
 
 # Results
 print(f"dict:  {dict_time:.4f}s")
-print(f"loc:   {loc_time:.4f}s")
-print(f"at:    {at_time:.4f}s")
-print(f"iloc:  {iloc_time:.4f}s")
-print(f"iat:   {iat_time:.4f}s")</code></pre>
+print(f"loc:   {loc_time:.4f}s  "
+      f"({loc_time / dict_time:5.1f}x slower than dict)")
+print(f"at:    {at_time:.4f}s  "
+      f"({at_time / dict_time:5.1f}x slower than dict)")
+print(f"iloc:  {iloc_time:.4f}s  "
+      f"({iloc_time / dict_time:5.1f}x slower than dict)")
+print(f"iat:   {iat_time:.4f}s  "
+      f"({iat_time / dict_time:5.1f}x slower than dict)")
+</code></pre>
 
         <h2>Typical Results</h2>
         <p>
-            Running this on Macbook Pro M4 (pandas 2.x, Python 3.11):
+            Running this on MacBook Pro M4 (pandas 2.3.3, Python 3.13.5) yields:
         </p>
 
-        <pre><code>dict:  0.0036s
-loc:   1.9263s  (532.6x slower than dict)
-at:    0.0137s  (  3.8x slower than dict)
-iloc:  0.0532s  ( 14.7x slower than dict)
-iat:   0.0386s  ( 10.7x slower than dict)</code></pre>
+        <pre><code class="language-plaintext">dict:  0.0025s
+loc:   0.0543s  ( 21.3x slower than dict)
+at:    0.0127s  (  5.0x slower than dict)
+iloc:  0.0493s  ( 19.3x slower than dict)
+iat:   0.0417s  ( 16.3x slower than dict)</code></pre>
 
         <p>
-            The difference is stark. With 10 million rows, <code>.loc[]</code> is dramatically
-            slower than everything else &ndash; over 533x slower than a plain dict. Even
-            <code>.at[]</code>, the fastest pandas accessor, is still 4x slower than dict.
-            The position-based methods (<code>.iloc[]</code>, <code>.iat[]</code>) fall
-            somewhere in between.
+            The difference is stark. With 1 million rows, <code>.loc[]</code> is over 21x slower than a plain dict.
+            Even <code>.at[]</code>, the fastest pandas accessor, is still 5x slower.
+            The position-based methods (<code>.iloc[]</code>, <code>.iat[]</code>) are
+            surprisingly slow as well.
         </p>
 
         <p>
             <strong>A note on vectorization:</strong> The production code I encountered genuinely
-            required element-wise lookups &ndash; it was embedded in dataset iterator. But more
-            often than not, what looks like a loop can be rewritten
-            as a vectorized operation, which will be orders of magnitude faster than any
+            required element-wise lookups &ndash; it was embedded in a dataset iterator. Often 
+            what looks like a loop can be rewritten
+            as a vectorized operation, which is orders of magnitude faster than any
             element-wise approach.
         </p>
 
@@ -154,8 +168,8 @@ iat:   0.0386s  ( 10.7x slower than dict)</code></pre>
 
         <h2>Why This Happens</h2>
         <p>
-            The reason is simple: <code>.loc[]</code> and <code>.iloc[]</code> are general-purpose
-            accessors. They handle:
+            <code>.loc[]</code> and <code>.iloc[]</code> are general-purpose
+            accessors designed to handle:
         </p>
         <ul>
             <li>Single values, rows, columns, and arbitrary slices</li>
@@ -174,25 +188,23 @@ iat:   0.0386s  ( 10.7x slower than dict)</code></pre>
             Use the right tool for the job:
         </p>
         <ul>
-            <li><strong>Plain dict</strong> for key-value lookups in loops (fastest)</li>
-            <li><strong><code>.at[row, col]</code></strong> for single scalar by label if you must use pandas</li>
-            <li><strong><code>.loc[]</code></strong> for slices, boolean masks, or multi-row/column access</li>
-            <li><strong><code>.iloc[]</code>/<code>.iat[]</code></strong> for position-based access (but note they're slower than label-based)</li>
+            <li><strong>Plain dict</strong> &ndash; for key-value lookups in loops (fastest)</li>
+            <li><strong><code>.at[row, col]</code></strong> &ndash; for single scalar by label when you must use pandas</li>
+            <li><strong><code>.loc[]</code></strong> &ndash; for slices, boolean masks, or multi-row/column access</li>
+            <li><strong><code>.iloc[]</code>/<code>.iat[]</code></strong> &ndash; for position-based access (but note they're slower than label-based)</li>
         </ul>
 
         <h2>Takeaways</h2>
         <ul>
-            <li>For key-value lookups in loops: use a plain dict (4-24x faster than pandas)</li>
-            <li>If you must use pandas for scalar access: <code>.at[]</code> over <code>.loc[]</code></li>
-            <li>For bulk operations: always vectorize</li>
-            <li>Profile before optimizing &ndash; the bottleneck is rarely where you think</li>
+            <li>For key-value lookups in loops, convert DataFrame to a plain dict (5&ndash;20x faster than pandas)</li>
+            <li>If you must use pandas for scalar access, prefer <code>.at[]</code> over <code>.loc[]</code></li>
+            <li>For bulk operations, always vectorize</li>
         </ul>
 
         <h2>References</h2>
         <ul>
             <li><a href="https://github.com/pandas-dev/pandas/issues/54550">GitHub Issue #54550: Unreliable performance of .loc with non-unique index</a></li>
             <li><a href="https://github.com/pandas-dev/pandas/issues/6683">GitHub Issue #6683: Poor performance for .loc and .iloc</a></li>
-            <li><a href="https://pandas.pydata.org/docs/user_guide/enhancingperf.html">pandas documentation: Enhancing performance</a></li>
         </ul>
 
     </article>
@@ -200,5 +212,6 @@ iat:   0.0386s  ( 10.7x slower than dict)</code></pre>
     <footer>
         <a href="../blog.html">&larr; Back to blog</a>
     </footer>
+<!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "6f893c39c896459da341bb0145f4e85e"}'></script><!-- End Cloudflare Web Analytics -->
 </body>
 </html>
