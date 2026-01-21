@@ -127,6 +127,83 @@ Static hosting (GitHub Pages, Netlify, Cloudflare Pages) - all free for static s
 
 ---
 
+## Blog post anti-patterns (how NOT to write)
+
+* **"Hello World" filler that never gets to the point**
+  * 6–10 paragraphs about the author's "journey," what tech is, why learning matters.
+  * The actual problem statement appears halfway down, and the takeaway is vague.
+
+* **No problem definition, only a solution dump**
+  * Starts with code immediately.
+  * Never says *what* the system is supposed to do, what inputs/outputs are, or what constraints exist.
+  * Readers can't tell whether the code is correct or relevant.
+
+* **Unreproducible "tutorial"**
+  * Missing versions (language/runtime, OS, GPU/CPU, library versions).
+  * Hidden prerequisites ("assumes you already configured X").
+  * Uses private datasets/credentials without substitutes.
+  * No runnable minimal example; code snippets are partial and out of order.
+
+* **"Works on my machine" benchmarking**
+  * Claims "10× faster" without:
+    * baseline definition,
+    * dataset description,
+    * hardware specs,
+    * warmup/measurement method,
+    * variance/error bars.
+  * Mixes throughput and latency.
+  * Changes multiple variables at once (compiler flags, batch size, model, caching).
+
+* **Cargo-cult explanations (hand-wavy correctness)**
+  * "We just add a mutex here to fix race conditions."
+  * No explanation of the actual race, why the fix works, or what trade-offs were introduced.
+  * No proof, no tests, no reasoning.
+
+* **Inaccurate or misleading diagrams**
+  * Architecture diagram with arrows everywhere, no legend, no directionality.
+  * Labels like "AI module" or "Database" with no specificity.
+  * Diagram contradicts the text or ignores failure modes and data flow.
+
+* **Massive, monolithic code blocks with no narrative**
+  * 200+ lines pasted with no segmentation.
+  * No explanation of key functions, naming choices, or invariants.
+  * No "here's how to adapt this" section.
+
+* **Jargon soup aimed at impressing, not teaching**
+  * Overuses buzzwords (synergy, blockchain, "LLM-powered") without precise meaning.
+  * Defines nothing, assumes everything.
+  * Avoids concrete examples because they'd reveal the author doesn't understand it.
+
+* **Cherry-picked or misleading security guidance**
+  * "Just disable TLS verification to fix cert issues."
+  * Stores secrets in code examples.
+  * Suggests dangerous defaults without warnings or safer alternatives.
+
+* **No audience targeting**
+  * The post claims to be "beginner-friendly" but uses advanced concepts without intro.
+  * Or claims "deep dive" but stays superficial and omits details experts need.
+
+* **No failure modes, no edge cases**
+  * Happy-path only.
+  * Ignores what happens when:
+    * the network is down,
+    * the input is malformed,
+    * the model returns unexpected output,
+    * the DB is slow,
+    * concurrency increases.
+
+* **Broken structure and navigation**
+  * No headings, or headings that don't match content.
+  * Important info buried in footnotes.
+  * No summary, no "what you'll learn," no quick-start, no conclusion.
+
+* **Outdated advice presented as timeless**
+  * Uses deprecated APIs without noting deprecation.
+  * Links to old docs.
+  * Doesn't state publication date, update history, or tested versions.
+
+---
+
 ## Fonts on a developer personal page
 
 ### How many fonts

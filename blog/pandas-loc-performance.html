@@ -66,7 +66,6 @@ import numpy as np
 import random
 import time
 
-# Configuration
 NUM_ITEMS = 1_000_000
 NUM_LOOKUPS = 10_000
 
@@ -78,11 +77,10 @@ data = {
     }
 keys = list(data.keys())
 
-# Create DataFrame with same data
-# Data are indexed by img_X keys, this should be fast, right?
+# Create DataFrame with test data
 df = pd.DataFrame(
     {"value": data.values()},
-    index=data.keys()
+    index=data.keys() # this should be fast, right?
     )
 # Warm-up access to avoid any lazy initialization overhead
 _ = df.loc[keys[0]]
@@ -126,7 +124,6 @@ for idx in lookup_indices:
     _ = df.iat[idx, 0]
 iat_time = time.perf_counter() - start
 
-# Results
 print(f"dict:  {dict_time:.4f}s")
 print(f"loc:   {loc_time:.4f}s  "
       f"({loc_time / dict_time:5.1f}x slower than dict)")
