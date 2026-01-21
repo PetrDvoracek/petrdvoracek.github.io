@@ -158,41 +158,9 @@ iat:   0.0417s  ( 16.3x slower than dict)</code></pre>
 
         <p>
             <strong>A note on vectorization:</strong> The production code I encountered genuinely
-            required element-wise lookups &ndash; it was embedded in a dataset iterator. Often 
-            what looks like a loop can be rewritten
-            as a vectorized operation, which is orders of magnitude faster than any
-            element-wise approach.
+            required element-wise lookups &ndash; it was embedded in a dataset iterator. In this 
+            case, vectorization wasn't an option.
         </p>
-
-        
-
-        <h2>Why This Happens</h2>
-        <p>
-            <code>.loc[]</code> and <code>.iloc[]</code> are general-purpose
-            accessors designed to handle:
-        </p>
-        <ul>
-            <li>Single values, rows, columns, and arbitrary slices</li>
-            <li>Boolean masks and callable indexers</li>
-            <li>MultiIndex navigation</li>
-            <li>Duplicate index handling</li>
-            <li>Type coercion and validation</li>
-        </ul>
-        <p>
-            All that flexibility comes at a cost. When you only need a single scalar value,
-            you're paying for features you don't use.
-        </p>
-
-        <h2>The Fix</h2>
-        <p>
-            Use the right tool for the job:
-        </p>
-        <ul>
-            <li><strong>Plain dict</strong> &ndash; for key-value lookups in loops (fastest)</li>
-            <li><strong><code>.at[row, col]</code></strong> &ndash; for single scalar by label when you must use pandas</li>
-            <li><strong><code>.loc[]</code></strong> &ndash; for slices, boolean masks, or multi-row/column access</li>
-            <li><strong><code>.iloc[]</code>/<code>.iat[]</code></strong> &ndash; for position-based access (but note they're slower than label-based)</li>
-        </ul>
 
         <h2>Takeaways</h2>
         <ul>
