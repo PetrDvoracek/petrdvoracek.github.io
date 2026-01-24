@@ -35,10 +35,6 @@
         <h1>The Hidden Performance Trap in pandas.loc[]</h1>
         <p class="meta">January 16, 2026</p>
 
-        <blockquote class="pull-quote">
-            Stop using DataFrame.loc[...] for scalar lookups. Please.
-        </blockquote>
-
         <p>
             Recently I came across production code where pandas' <code>.loc[]</code> was
             being used in a tight loop to access rows repeatedly. The performance was,
