@@ -283,11 +283,66 @@ footer {
     text-align: center;
 }
 
+/* Site header (compact version for inner pages) */
+.site-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.site-header .photo {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.site-header .identity {
+    flex: 1;
+}
+
+.site-header .name {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text);
+    text-decoration: none;
+}
+
+.site-header .name:hover {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.site-header nav {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.9rem;
+}
+
+.site-header nav a {
+    color: var(--text-secondary);
+    text-decoration: none;
+}
+
+.site-header nav a:hover {
+    color: var(--accent);
+}
+
+.site-header nav a.active {
+    color: var(--accent);
+    font-weight: 600;
+}
+
 /* Blog post styles */
 .back {
     display: inline-block;
-    margin-bottom: 2rem;
-    font-size: 0.95rem;
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
 }
 
 .back::before {
