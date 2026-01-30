@@ -3,13 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="view-transition" content="same-origin">
     <meta name="description" content="POST_DESCRIPTION">
     <title>POST_TITLE | Petr Dvořáček</title>
     <link rel="stylesheet" href="../style.css">
+
+    <!-- Preload header image to prevent flicker -->
+    <link rel="preload" as="image" href="/me.jpg">
 </head>
 <body>
     <header class="site-header">
-        <img src="/me.jpg" alt="Petr Dvořáček" class="photo" width="48" height="48">
+        <img src="/me.jpg" alt="Petr Dvořáček" class="photo" width="48" height="48" fetchpriority="high">
         <div class="identity">
             <a href="../index.html" class="name">Petr Dvořáček</a>
         </div>

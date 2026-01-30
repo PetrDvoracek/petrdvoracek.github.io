@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="view-transition" content="same-origin">
     <meta name="description" content="Blog - Petr Dvořáček writes about AI, computer vision, and software development">
     <title>Blog | Petr Dvořáček</title>
     <link rel="canonical" href="https://petrdvoracek.github.io/blog.html">
@@ -22,10 +23,13 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="style.css">
+
+    <!-- Preload header image to prevent flicker -->
+    <link rel="preload" as="image" href="/me.jpg">
 </head>
 <body>
     <header class="site-header">
-        <img src="/me.jpg" alt="Petr Dvořáček" class="photo" width="48" height="48">
+        <img src="/me.jpg" alt="Petr Dvořáček" class="photo" width="48" height="48" fetchpriority="high">
         <div class="identity">
             <a href="index.html" class="name">Petr Dvořáček</a>
         </div>

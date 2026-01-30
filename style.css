@@ -2,6 +2,26 @@
 /* Weights: 400 (body) + 600 (headings) only */
 /* Fonts loaded via <link> in HTML for better LCP performance */
 
+/* Enable cross-document view transitions */
+@view-transition {
+    navigation: auto;
+}
+
+/* Keep header stable during page transitions */
+.site-header {
+    view-transition-name: site-header;
+}
+
+header:not(.site-header) {
+    view-transition-name: main-header;
+}
+
+/* Smooth fade for page content */
+::view-transition-old(root),
+::view-transition-new(root) {
+    animation-duration: 0.15s;
+}
+
 :root {
     --text: #1a1a1a;
     --text-secondary: #555;
