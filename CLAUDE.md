@@ -204,6 +204,32 @@ Static hosting (GitHub Pages, Netlify, Cloudflare Pages) - all free for static s
 
 ---
 
+## Blog post references section
+
+Structure the references section consistently:
+
+1. **Use subheadings** to group references by type (e.g., "Papers", "Production-ready implementations", "Further reading")
+2. **Add context** for each reference — don't just link, explain what it is
+3. **For code implementations**, include a brief note connecting them to the blog content (e.g., "These are the full-featured implementations mentioned in the introduction")
+
+Example structure:
+```html
+<h2>References</h2>
+
+<h3>Papers</h3>
+<ul>
+    <li><a href="...">Author et al., "Title" (Year)</a> — Brief description</li>
+</ul>
+
+<h3>Production-ready implementations</h3>
+<p>Context about why these are listed:</p>
+<ul>
+    <li><a href="...">Name</a> — What it is / who maintains it</li>
+</ul>
+```
+
+---
+
 ## Fonts on a developer personal page
 
 ### How many fonts

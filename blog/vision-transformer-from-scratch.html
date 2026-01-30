@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Build a Vision Transformer (ViT) from scratch in ~80 lines of PyTorch. No magic, just the core ideas explained clearly.">
+    <title>Vision Transformer from Scratch in 80 Lines | Petr Dvořáček</title>
+    <link rel="canonical" href="https://petrdvoracek.github.io/blog/vision-transformer-from-scratch.html">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Vision Transformer from Scratch in 80 Lines">
+    <meta property="og:description" content="Build a Vision Transformer (ViT) from scratch in ~80 lines of PyTorch. No magic, just the core ideas explained clearly.">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://petrdvoracek.github.io/blog/vision-transformer-from-scratch.html">
+
+    <!-- Favicon -->
+    <link rel="icon" href="/favicon.ico" sizes="32x32">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="../style.css">
+
+    <!-- Syntax highlighting -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+    <script>document.addEventListener('DOMContentLoaded', () => hljs.highlightAll());</script>
+</head>
+<body>
+    <a href="../blog.html" class="back">Back to blog</a>
+
+    <article>
+        <h1>Vision Transformer from Scratch in 80 Lines</h1>
+        <p class="meta">January 29, 2026</p>
+
+        <p>
+            You can find several implementations of the Vision Transformer (ViT) models on github, such as the one from <a href="https://github.com/huggingface/pytorch-image-models/blob/main/timm/models/vision_transformer.py#L681">timm</a>, the <a href="https://github.com/lucidrains/vit-pytorch/blob/main/vit_pytorch/vit.py#L85">lucidrains'</a>, or the <a href="https://github.com/google-research/vision_transformer/blob/main/vit_jax/models_vit.py#L211">original</a> implementation from the paper, but these are complex and hard to follow.
+            This gives the impression that ViTs are complicated beasts. In reality, the core ideas are quite simple.
+            In this post, we'll build a simplified version of Vision Transformer (ViT) from scratch in about 80 lines of PyTorch code.
+            No magic, just the essential components explained clearly. You may be surprised that the first operation in ViT is actually a convolution.
+        </p>
+
+        <p>
+            Simplicity is not for free. Compared to other implementations, this version omits several important features like positional embeddings, multi-head attention, deeper MLPs, and special activation functions like GELU. The goal is to focus on the core principle without distractions, not to excel in benchmarks.
+        </p>
+
+        <h2>Input preprocessing &ndash; Patch Embedding</h2>
+        <p>
+             Transformers process data as a sequence of tokens. A token is, simply said, just a 1D list of numbers that represents part of the input &ndash; an embedding vector.  It does not matter whether we talk about an NLP domain (words/subwords as tokens), speech domain (audio frames as tokens), or vision domain (image patches as tokens). We can even combine all of these modalities into a single transformer model, as long as we can represent the input as a sequence of tokens that meaningfully represent the input data.
+        </p>
+        <p>
+            Mathematically speaking, a token is an embedding vector with N dimensions (often N is in range 384 to 1024, depending on the model). In ViT, the input image is split into fixed-size patches (e.g., 16&times;16 pixels). Thus each token represents patch of 16&times;16 pixels. Each patch is then projected into an N-dimensional embedding vector using a linear layer. This gives us a sequence of patch embeddings that can be fed into the transformer.
+        </p>
+        <p>
+            This patch embedding projection is in practice done by a <strong>convolutional layer</strong> with kernel size and stride equal to the patch size. In this setting, the convolution extracts non-overlapping patches and projects them into the desired embedding
+            dimension in a single step.
+        </p>
+
+        <pre><code class="language-python">class PatchEmbedding(nn.Module):
+    """Convert image into patch embeddings."""
+
+    def __init__(self, patch_size, embed_dim):
+        super().__init__()
+        self.proj = nn.Conv2d(
+            3, embed_dim, kernel_size=patch_size, stride=patch_size
+        )
+
+    def forward(self, x):
+        # x: (batch, 3, H, W) -> (batch, embed_dim, H/P, W/P)
+        x = self.proj(x)
+
+        # Flatten spatial dims:
+        # (batch, embed_dim, N) -> (batch, N, embed_dim)
+        x = x.flatten(2).transpose(1, 2)
+        return x</code></pre>
+
+        <p>
+            After applying the convolution with <code>self.proj(x)</code>, the spatial dimension is flattened with <code>x.flatten(2)</code>.  <strong>We lost the 2D spatial structure of the image</strong>. The <code>embed_dim</code>, which could also be called channel dimension, or token dimension, is moved to the last dimension with <code>transpose(1, 2)</code>. For a 224&times;224 image with patch size 16, you get (224/16)&sup2; = 196 patches.
+            Each patch is a 16&times;16&times;3 = 768 pixel region, projected to <code>embed_dim</code> dimensions.
+        </p>
+
+        <h2>Self-Attention</h2>
+        <p>
+            Self-attention lets each patch "look at" every other patch to gather context.
+            For simplicity, this implementation uses single-head attention.
+        </p>
+
+        <pre><code class="language-python">class Attention(nn.Module):
+    """Multi-head self-attention (simplified to single head)."""
+
+    def __init__(self, dim):
+        super().__init__()
+        self.q = nn.Linear(dim, dim)
+        self.k = nn.Linear(dim, dim)
+        self.v = nn.Linear(dim, dim)
+        self.proj = nn.Linear(dim, dim)
+        self.scale = dim**-0.5
+
+    def forward(self, x):
+        B, N, C = x.shape
+
+        q, k, v = self.q(x), self.k(x), self.v(x)
+
+        # Scaled dot-product attention
+        attn = torch.matmul(q, k.transpose(-2, -1)) * self.scale
+        attn = attn.softmax(dim=-1)
+
+        x = torch.matmul(attn, v)
+        x = self.proj(x)
+        return x</code></pre>
+
+        <p>
+            The three projections <code>self.q</code>, <code>self.k</code>, and <code>self.v</code> create query (Q), key (K), and value (V) representations. Q, K and V are just different projections of the same input.  The most important is V, which stores the information encoded in the patch that is passed as an output of transformer block. Before it is passed, its significance is scaled by attention weights computed from Q and K. In this way, other tokens can influence how much relevant is the information in particular patch in the context of all other patches.
+        </p>
+        <p>
+            This framework allows the model to focus on different parts of the input image dynamically, amplifying some signals while suppressing others based on their relevance given by Q and K while adjusting the embedding information of each token in V.
+            
+            The attention formula is:
+        </p>
+        <pre class="math">Attention(Q, K, V) = softmax(QK<sup>T</sup> / &radic;d) &middot; V</pre>
+        <p>
+
+            The dot product <math><msup><mi>QK</mi><mn>T</mn></msup></math> computes similarity scores between queries and keys. If the similarity is high, the projected token representation in V is amplified, if low, it is diminished. The softmax normalizes these scores into probabilities, ensuring they sum to 1 across the last, embedding dimension. The division by &radic;d prevents dot products from becoming too large, which would push softmax into regions with tiny gradients. 
+        </p>
+
+        <p>
+            The attention framework provides a powerful way for the model to dynamically focus on different parts of the input image, enabling it to capture global context effectively. It allows the model to amplify relevant features V (when Q and K are matching) while suppressing less important ones (when Q and K are not matching).
+        </p>
+
+        <h2>Transformer Block</h2>
+        <p>
+            A transformer block combines attention with a feedforward network (here simplified
+            to a single linear layer). The "pre-norm" variant applies LayerNorm before each
+            sublayer, with residual connections around both.
+        </p>
+
+        <pre><code class="language-python">class TransformerBlock(nn.Module):
+    """Single transformer block with pre-norm."""
+
+    def __init__(self, dim):
+        super().__init__()
+        self.norm1 = nn.LayerNorm(dim)
+        self.attn = Attention(dim)
+        self.norm2 = nn.LayerNorm(dim)
+        self.mlp = nn.Linear(dim, dim)
+
+    def forward(self, x):
+        x = x + self.attn(self.norm1(x))
+        x = x + self.mlp(self.norm2(x))
+        return x</code></pre>
+
+        <p>
+            The residual connections (<code>x = x + ...</code>) let gradients flow directly
+            through the network, enabling training of deep models.
+        </p>
+
+        <h2>Putting It Together: ViT</h2>
+        <p>
+            Classification token (CLS) is additional learnable token that flows through the transformer together with the input tokens. It forms a kind of <i>register</i>, where transformer is forced by loss to store global representation of the input. At the end of the neural network, right before the classification head, instead of aggregating the spatial information using global average pooling, as often done in CNNs, the ViT throws away all spatial tokens and use only CLS token for final classification.
+        </p>
+
+        <pre><code class="language-python">class ViT(nn.Module):
+    """Vision Transformer for image classification."""
+
+    def __init__(self, patch_size=16, embed_dim=512, num_classes=10):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.patch_embed = PatchEmbedding(patch_size, embed_dim)
+        self.cls_token = nn.Parameter(torch.randn(1, 1, embed_dim))
+        self.blocks = nn.Sequential(TransformerBlock(embed_dim))
+        self.head = nn.Linear(embed_dim, num_classes)
+
+    def forward(self, x):
+        x = self.patch_embed(x)
+
+        # Prepend CLS token: (batch, 1, embed_dim)
+        cls = self.cls_token.expand(x.shape[0], 1, self.embed_dim)
+        x = torch.cat([cls, x], dim=1)
+
+        x = self.blocks(x)
+
+        # Classify using CLS token (first position)
+        return self.head(x[:, 0])</code></pre>
+
+        <p>
+            <strong>Why a CLS token?</strong> It's a design choice borrowed from BERT. The ViT architecture is heavily influenced by language models. In language models, the CLS token
+            works best in the aggregation of the input for next token prediction. You could achieve similar results also by employing global average pooling instead of using CLS token in many vision tasks.
+        </p>
+
+        <h2>Running the Code</h2>
+        <p>
+            Here's how to instantiate the model and run a forward pass:
+        </p>
+
+        <pre><code class="language-python">import torch
+
+# Create model
+model = ViT(patch_size=16, embed_dim=512, num_classes=10)
+
+# Random batch of 4 images, 3 channels, 224x224
+x = torch.randn(4, 3, 224, 224)
+
+# Forward pass
+logits = model(x)  # shape: (4, 10)
+
+print(f"Input shape:  {x.shape}")
+print(f"Output shape: {logits.shape}")</code></pre>
+
+        <p>
+            Tested with PyTorch 2.0+, Python 3.10+.
+        </p>
+
+        <h2>References</h2>
+
+        <h3>Papers</h3>
+        <ul>
+            <li><a href="https://arxiv.org/abs/2010.11929">Dosovitskiy et al., "An Image is Worth 16x16 Words" (2020)</a> &ndash; The original ViT paper</li>
+            <li><a href="https://arxiv.org/abs/1706.03762">Vaswani et al., "Attention Is All You Need" (2017)</a> &ndash; The transformer architecture paper</li>
+        </ul>
+
+        <h3>Production-ready implementations</h3>
+        <p>These are the full-featured implementations mentioned in the introduction:</p>
+        <ul>
+            <li><a href="https://github.com/huggingface/pytorch-image-models/blob/main/timm/models/vision_transformer.py#L681">timm</a> &ndash; PyTorch Image Models library by Hugging Face</li>
+            <li><a href="https://github.com/lucidrains/vit-pytorch/blob/main/vit_pytorch/vit.py#L85">vit-pytorch</a> &ndash; Clean PyTorch implementation by lucidrains</li>
+            <li><a href="https://github.com/google-research/vision_transformer/blob/main/vit_jax/models_vit.py#L211">vision_transformer</a> &ndash; Original JAX implementation by Google Research</li>
+        </ul>
+
+    </article>
+
+    <footer>
+        <a href="../blog.html">&larr; Back to blog</a>
+    </footer>
+<!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "6f893c39c896459da341bb0145f4e85e"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>

@@ -504,6 +504,20 @@ article pre code {
     }
 }
 
+/* Math equations */
+.math, math-inline {
+    font-family: "Times New Roman", Times, serif;
+    font-style: italic;
+}
+
+.math-block, math-block {
+    font-family: "Times New Roman", Times, serif;
+    font-style: italic;
+    display: block;
+    text-align: center;
+    margin: 1.25rem 0;
+}
+
 article a {
     text-decoration: underline;
     text-decoration-color: var(--accent);
