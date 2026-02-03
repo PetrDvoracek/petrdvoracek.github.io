@@ -1,5 +1,4 @@
-/* Fonts: Inter (UI/headings) + Literata (article body) - 2 families per CLAUDE.md guidelines */
-/* Weights: 400 (body) + 600 (headings) only */
+/* Fonts: Literata (body) + Inter (headings/UI) */
 /* Fonts loaded via <link> in HTML for better LCP performance */
 
 /* Enable cross-document view transitions */
@@ -33,12 +32,12 @@ header:not(.site-header) {
 
 @media (prefers-color-scheme: dark) {
     :root {
-        --text: #e8e8e8;
-        --text-secondary: #a8a8a8;
-        --accent: #60a5fa;
-        --bg: #0f0f0f;
-        --bg-alt: #1a1a1a;
-        --border: #2a2a2a;
+        --text: #c8c8c8;
+        --text-secondary: #959595;
+        --accent: #6cacff;
+        --bg: #1a1a1a;
+        --bg-alt: #232323;
+        --border: #333;
     }
 }
 
@@ -59,6 +58,15 @@ body {
     font-size: 1.05rem;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+}
+
+/* Dark mode: improve serif readability */
+@media (prefers-color-scheme: dark) {
+    body {
+        letter-spacing: 0.01em;
+        -webkit-font-smoothing: subpixel-antialiased;
+        -moz-osx-font-smoothing: auto;
+    }
 }
 
 a {
@@ -370,7 +378,6 @@ footer {
 }
 
 article {
-    font-family: 'Literata', Georgia, 'Times New Roman', serif;
     font-size: 1.1rem;
     line-height: 1.8;
 }
