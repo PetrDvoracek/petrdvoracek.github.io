@@ -51,14 +51,13 @@
         <p class="meta">January 29, 2026</p>
 
         <p>
-            You can find several implementations of the Vision Transformer (ViT) models on github, such as the one from <a href="https://github.com/huggingface/pytorch-image-models/blob/main/timm/models/vision_transformer.py#L681">timm</a>, the <a href="https://github.com/lucidrains/vit-pytorch/blob/main/vit_pytorch/vit.py#L85">lucidrains'</a>, or the <a href="https://github.com/google-research/vision_transformer/blob/main/vit_jax/models_vit.py#L211">original</a> implementation from the paper, but these are complex and hard to follow.
-            This gives the impression that ViTs are complicated beasts. In reality, the core ideas are quite simple.
-            In this post, we'll build a simplified version of Vision Transformer (ViT) from scratch in about 80 lines of PyTorch code.
-            No magic, just the essential components explained clearly. You may be surprised that the first operation in ViT is actually a convolution.
+            There are plenty of ViT implementations on GitHub &ndash; <a href="https://github.com/huggingface/pytorch-image-models/blob/main/timm/models/vision_transformer.py#L681">timm</a>, <a href="https://github.com/lucidrains/vit-pytorch/blob/main/vit_pytorch/vit.py#L85">lucidrains'</a>, and the <a href="https://github.com/google-research/vision_transformer/blob/main/vit_jax/models_vit.py#L211">reference code</a> from the paper, but these are complex and hard to follow.
+            The basic idea is simpler than it looks. Below I build a minimal ViT in ~80 lines of PyTorch to highlight the essentials. Patch embedding, for example, is just a simple convolutional layer.
+            
         </p>
 
         <p>
-            Simplicity is not for free. Compared to other implementations, this version omits several important features like positional embeddings, multi-head attention, deeper MLPs, and special activation functions like GELU. The goal is to focus on the core principle without distractions, not to excel in benchmarks.
+            This minimal version is deliberately incomplete: I’m skipping positional embeddings and multi-head attention (using a single-head variant), keeping the MLP shallow, and using plain activations instead of GELU. The goal is clarity, not benchmark performance.
         </p>
 
         <h2>Input preprocessing &ndash; Patch Embedding</h2>
