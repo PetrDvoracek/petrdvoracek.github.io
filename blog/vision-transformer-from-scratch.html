@@ -57,19 +57,37 @@
         </p>
 
         <p>
-            This minimal version is deliberately incomplete: I’m skipping positional embeddings and multi-head attention (using a single-head variant), keeping the MLP shallow, and using plain activations instead of GELU. The goal is clarity, not benchmark performance.
+            This minimal version is deliberately incomplete: I’m skipping positional embeddings and multi-head attention (using a single-head variant), keeping the MLP shallow, and using plain activations instead of GELU. The goal is clarity, not benchmark performance. Thanks to the clarity of this implementation, we will be able to deduce an intuition for ViT at the end of this article.
         </p>
 
         <h2>Input preprocessing &ndash; Patch Embedding</h2>
-        <p>
+        <!-- <p>
              Transformers process data as a sequence of tokens. A token is, simply said, just a 1D list of numbers that represents part of the input &ndash; an embedding vector.  It does not matter whether we talk about an NLP domain (words/subwords as tokens), speech domain (audio frames as tokens), or vision domain (image patches as tokens). We can even combine all of these modalities into a single transformer model, as long as we can represent the input as a sequence of tokens that meaningfully represent the input data.
-        </p>
+        </p> -->
         <p>
+            Transformers operate on sequences of tokens.
+            A token is simply a vector representation of some part of the input.
+            In NLP, tokens represent words or subwords.
+            In vision, tokens represent image patches.
+        </p>
+        <!-- <p>
             Mathematically speaking, a token is an embedding vector with N dimensions (often N is in range 384 to 1024, depending on the model). In ViT, the input image is split into fixed-size patches (e.g., 16&times;16 pixels). Thus each token represents patch of 16&times;16 pixels. Each patch is then projected into an N-dimensional embedding vector using a linear layer. This gives us a sequence of patch embeddings that can be fed into the transformer.
         </p>
         <p>
             This patch embedding projection is in practice done by a <strong>convolutional layer</strong> with kernel size and stride equal to the patch size. In this setting, the convolution extracts non-overlapping patches and projects them into the desired embedding
             dimension in a single step.
+        </p> -->
+        <p>
+            In ViT, the image is split into fixed-size patches (e.g., 16×16 pixels).
+            Each patch is projected into an embedding vector of dimension <code>embed_dim</code>. Typical ViT models use embedding sizes between 384 and 1024, but this is a design choice.
+            The 2D grid of patch embeddings is then reshaped into a 1D sequence of tokens using <code>flatten()</code>.
+            
+        </p>
+
+        <p>
+            In practice, patch extraction and projection can be implemented using
+            a convolution with kernel size and stride equal to the patch size.
+            This produces non-overlapping patches and projects them into the embedding dimension in one step, mapping each 16×16 px patch to a single embedding vector.
         </p>
 
         <pre><code class="language-python">class PatchEmbedding(nn.Module):
@@ -85,24 +103,31 @@
         # x: (batch, 3, H, W) -> (batch, embed_dim, H/P, W/P)
         x = self.proj(x)
 
-        # Flatten spatial dims:
+        # Flatten spatial dims and make channel last:
         # (batch, embed_dim, N) -> (batch, N, embed_dim)
         x = x.flatten(2).transpose(1, 2)
         return x</code></pre>
 
         <p>
-            After applying the convolution with <code>self.proj(x)</code>, the spatial dimension is flattened with <code>x.flatten(2)</code>.  <strong>We lost the 2D spatial structure of the image</strong>. The <code>embed_dim</code>, which could also be called channel dimension, or token dimension, is moved to the last dimension with <code>transpose(1, 2)</code>. For a 224&times;224 image with patch size 16, you get (224/16)&sup2; = 196 patches.
-            Each patch is a 16&times;16&times;3 = 768 pixel region, projected to <code>embed_dim</code> dimensions.
+            After flattening, the explicit 2D structure is removed.
+            The model now treats the image as a sequence of patch embeddings.
+            For a 224×224 image with 16×16 patches, we obtain (224 / 16)² = 196 tokens.
+        </p>
+
+        <p>
+            Note that without positional embeddings (which we omit here),
+            the transformer has no explicit information about spatial ordering.
+            This limits performance but simplifies the example.
         </p>
 
         <h2>Self-Attention</h2>
         <p>
-            Self-attention lets each patch "look at" every other patch to gather context.
-            For simplicity, this implementation uses single-head attention.
+            Self-attention lets each patch effectively “look at” every other patch to gather context. It mixes information across spatial locations &ndash; acting as a <i>spatial mixer</i>.
+            For simplicity, we implement single-head scaled dot-product attention instead of the multi-head variant used in standard ViT models.
         </p>
 
         <pre><code class="language-python">class Attention(nn.Module):
-    """Multi-head self-attention (simplified to single head)."""
+    """Single-head self-attention."""
 
     def __init__(self, dim):
         super().__init__()
@@ -115,9 +140,11 @@
     def forward(self, x):
         B, N, C = x.shape
 
+        # q, k, v: (B, N, dim)
         q, k, v = self.q(x), self.k(x), self.v(x)
 
         # Scaled dot-product attention
+        # attn: (batch, N_q, N_k)
         attn = torch.matmul(q, k.transpose(-2, -1)) * self.scale
         attn = attn.softmax(dim=-1)
 
@@ -126,21 +153,19 @@
         return x</code></pre>
 
         <p>
-            The three projections <code>self.q</code>, <code>self.k</code>, and <code>self.v</code> create query (Q), key (K), and value (V) representations. Q, K and V are just different projections of the same input.  The most important is V, which stores the information encoded in the patch that is passed as an output of transformer block. Before it is passed, its significance is scaled by attention weights computed from Q and K. In this way, other tokens can influence how much relevant is the information in particular patch in the context of all other patches.
+            The projections <code>self.q</code>, <code>self.k</code>, and <code>self.v</code> create query (Q), key (K), and value (V) vectors. Q, K, and V are simply different projections of the same input. V stores the information encoded in each patch and is passed to the next transformer block. Before being passed on, it is scaled by attention weights computed from Q and K. This is how tokens representing different parts of the image influence each other based on their content.
         </p>
         <p>
-            This framework allows the model to focus on different parts of the input image dynamically, amplifying some signals while suppressing others based on their relevance given by Q and K while adjusting the embedding information of each token in V.
+            This framework allows the model to dynamically focus on different parts of the input image, enabling it to capture global context effectively by amplifying relevant features and suppressing less important ones. Specifically, it determines feature relevance through the interaction of Q and K, and accordingly adjusts the embedding information of each token in V that is passed to the next block, strengthening representations when Q and K match and weakening them when they do not.
             
             The attention formula is:
         </p>
         <pre class="math">Attention(Q, K, V) = softmax(QK<sup>T</sup> / &radic;d) &middot; V</pre>
-        <p>
-
-            The dot product <math><msup><mi>QK</mi><mn>T</mn></msup></math> computes similarity scores between queries and keys. If the similarity is high, the projected token representation in V is amplified, if low, it is diminished. The softmax normalizes these scores into probabilities, ensuring they sum to 1 across the last, embedding dimension. The division by &radic;d prevents dot products from becoming too large, which would push softmax into regions with tiny gradients. 
-        </p>
 
         <p>
-            The attention framework provides a powerful way for the model to dynamically focus on different parts of the input image, enabling it to capture global context effectively. It allows the model to amplify relevant features V (when Q and K are matching) while suppressing less important ones (when Q and K are not matching).
+            The dot product <math><msup><mi>QK</mi><mn>T</mn></msup></math>  produces similarity scores between tokens.
+            The softmax normalizes across the key (token) dimension for each query.
+            Scaling by √d stabilizes gradients when the embedding dimension grows.
         </p>
 
         <h2>Transformer Block</h2>
@@ -171,9 +196,10 @@
         </p>
 
         <h2>Putting It Together: ViT</h2>
-        <p>
-            Classification token (CLS) is additional learnable token that flows through the transformer together with the input tokens. It forms a kind of <i>register</i>, where transformer is forced by loss to store global representation of the input. At the end of the neural network, right before the classification head, instead of aggregating the spatial information using global average pooling, as often done in CNNs, the ViT throws away all spatial tokens and use only CLS token for final classification.
-        </p>
+            <p>
+                The classification token (CLS) is an additional learnable token that flows through the transformer together with the input tokens. It acts as a kind of <i>register</i>, where the transformer learns, through the training loss, to store a global representation of the input. At the end of the network, right before the classification head, instead of aggregating spatial information using global average pooling (as often done in CNNs), the ViT discards the spatial tokens and uses only the CLS token for final classification.
+            </p>
+
 
         <pre><code class="language-python">class ViT(nn.Module):
     """Vision Transformer for image classification."""
