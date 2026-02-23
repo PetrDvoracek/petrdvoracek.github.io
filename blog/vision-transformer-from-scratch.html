@@ -197,7 +197,7 @@
 
         <h2>Putting It Together: ViT</h2>
             <p>
-                The classification token (CLS) is an additional learnable token that flows through the transformer together with the input tokens. It acts as a kind of <i>register</i>, where the transformer learns, through the training loss, to store a global representation of the input. At the end of the network, right before the classification head, instead of aggregating spatial information using global average pooling (as often done in CNNs), the ViT discards the spatial tokens and uses only the CLS token for final classification.
+                The classification token (CLS) is an additional learnable token that flows through the transformer together with the input tokens. It acts as a <i>register</i>, where the transformer stores a global representation of the input. At the end of the network, right before the classification head, instead of aggregating spatial information using global average pooling (as often done in CNNs), the ViT discards the spatial tokens and uses only the CLS token for final classification.
             </p>
 
 
