@@ -52,12 +52,12 @@
 
         <p>
             There are plenty of ViT implementations on GitHub &ndash; <a href="https://github.com/huggingface/pytorch-image-models/blob/main/timm/models/vision_transformer.py#L681">timm</a>, <a href="https://github.com/lucidrains/vit-pytorch/blob/main/vit_pytorch/vit.py#L85">lucidrains'</a>, and the <a href="https://github.com/google-research/vision_transformer/blob/main/vit_jax/models_vit.py#L211">reference code</a> from the paper, but these are complex and hard to follow.
-            The basic idea is simpler than it looks. Below I build a minimal ViT in ~80 lines of PyTorch to highlight the essentials. Patch embedding, for example, is just a simple convolutional layer.
+            The basic idea is simpler than it looks. Below, I build a minimal ViT in ~80 lines of PyTorch to highlight the essentials. Patch embedding, for example, is just a simple convolutional layer.
             
         </p>
 
         <p>
-            This minimal version is deliberately incomplete: I’m skipping positional embeddings and multi-head attention (using a single-head variant), keeping the MLP shallow, and using plain activations instead of GELU. The goal is clarity, not benchmark performance. Thanks to the clarity of this implementation, we will be able to deduce an intuition for ViT at the end of this article.
+            This minimal version is deliberately incomplete: I’m skipping positional embeddings and multi-head attention (using a single-head variant), keeping the MLP shallow, and using plain activations instead of GELU. The goal is clarity, not benchmark performance. Thanks to the clarity of this implementation, we will be able to build an intuition for ViT at the end of this article.
         </p>
 
         <h2>Input preprocessing &ndash; Patch Embedding</h2>
@@ -226,7 +226,7 @@
 
         <p>
             <strong>Why a CLS token?</strong> It's a design choice borrowed from BERT. The ViT architecture is heavily influenced by language models. In language models, the CLS token
-            works best in the aggregation of the input for next token prediction. You could achieve similar results also by employing global average pooling instead of using CLS token in many vision tasks.
+            is used to aggregate sequence information for downstream classification tasks. You could achieve similar results also by employing global average pooling instead of using CLS token in many vision tasks.
         </p>
 
         <h2>Running the Code</h2>
@@ -252,12 +252,40 @@ print(f"Output shape: {logits.shape}")</code></pre>
             Tested with PyTorch 2.0+, Python 3.10+.
         </p>
 
+        <h2>Intuition</h2>
+
+        <h3>Aggressive Spatial Compression at the Entry Point</h3>
+<p>
+        Each patch embedding collapses a 16×16 region of pixels into a single vector — all in one step. That's aggressive. You're throwing away a lot of spatial detail before the network has even started processing anything.
+</p>
+<p>
+        The original <a href="https://arxiv.org/pdf/2010.11929">ViT paper</a> actually acknowledged this. They proposed a Hybrid Architecture as an alternative: instead of that single brutal downsampling convolution, they used a pre-trained convolutional stem (a modified ResNet) to reduce spatial dimensions gradually. The idea is that a CNN is better at this early low-level processing than a raw patch projection.
+</p>
+<p>
+        Does it help? Yes — but only at smaller model sizes. Figure 5 in the paper shows hybrids consistently outperform pure ViTs when the model is small. Once you scale up, the gap closes and the hybrid advantage disappears entirely. </p>
+        <figure>
+            <img src="images/vit-hybrid.jpeg" alt="ViT Hybrid Architecture diagram from the original paper">
+        </figure>
+
+        <h3>ViT is low-pass filter</h3>
+        <p>
+        Vision Transformers behave as low-pass filters, while CNNs behave as high-pass filters.
+        </p>
+    
+        <p>
+        CNNs typically start with small convolutions — 3×3 in EfficientNet, 7×7 in ResNet. Small kernels respond strongly to sharp local changes — edges — making them naturally high-pass. ViT's 16×16 patch convolution averages over a much larger region, making it more sensitive to low-frequency information — textures rather than edges. </p>
+
+        <p>
+        This low-pass character isn't just a consequence of patchification. It's also built into self-attention itself, as shown in <a href="https://arxiv.org/pdf/2202.06709">How do Vision Transformers Work?</a>. It was further confirmed experimentally in this <a href="https://arxiv.org/pdf/2110.02797">study on adversarial robustness</a>. </p>
+
         <h2>References</h2>
 
         <h3>Papers</h3>
         <ul>
             <li><a href="https://arxiv.org/abs/2010.11929">Dosovitskiy et al., "An Image is Worth 16x16 Words" (2020)</a> &ndash; The original ViT paper</li>
             <li><a href="https://arxiv.org/abs/1706.03762">Vaswani et al., "Attention Is All You Need" (2017)</a> &ndash; The transformer architecture paper</li>
+            <li><a href="https://arxiv.org/pdf/2110.02797">Adversarial Robustness Comparison of Vision Transformer and MLP-Mixer to CNNs</a> &ndash; Patchification favours texture over edges</li>
+            <li><a href="https://arxiv.org/pdf/2202.06709">How do Vision Transformers Work?</a> &ndash; additional insight into how ViT works</li>
         </ul>
 
         <h3>Production-ready implementations</h3>
