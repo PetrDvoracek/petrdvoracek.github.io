@@ -121,7 +121,8 @@ header {
     margin-bottom: 0.5rem;
 }
 
-.intro .location {
+.intro .location,
+.intro .email {
     font-size: 0.9rem;
     color: var(--text-secondary);
 }
