@@ -57,7 +57,7 @@
         </p>
 
         <p>
-            This minimal version is deliberately incomplete: I’m skipping positional embeddings and multi-head attention (using a single-head variant), keeping the MLP shallow, and using plain activations instead of GELU. The goal is clarity, not benchmark performance. Thanks to the clarity of this implementation, we will be able to build an intuition for ViT at the end of this article.
+            This minimal version is deliberately incomplete: I’m skipping positional embeddings and multi-head attention (using a single-head variant), keeping the MLP shallow, and omitting the MLP’s activation entirely. The goal is clarity, not benchmark performance — and with the moving parts stripped away, we can build an intuition for ViT at the end of this article.
         </p>
 
         <h2>Input preprocessing &ndash; Patch Embedding</h2>
@@ -68,40 +68,195 @@
             Transformers operate on sequences of tokens.
             A token is simply a vector representation of some part of the input.
             In NLP, tokens represent words or subwords.
-            In vision, tokens represent image patches.
-        </p>
-        <!-- <p>
-            Mathematically speaking, a token is an embedding vector with N dimensions (often N is in range 384 to 1024, depending on the model). In ViT, the input image is split into fixed-size patches (e.g., 16&times;16 pixels). Thus each token represents patch of 16&times;16 pixels. Each patch is then projected into an N-dimensional embedding vector using a linear layer. This gives us a sequence of patch embeddings that can be fed into the transformer.
+            In vision, tokens represent image patches (Fig. 1).
         </p>
         <p>
-            This patch embedding projection is in practice done by a <strong>convolutional layer</strong> with kernel size and stride equal to the patch size. In this setting, the convolution extracts non-overlapping patches and projects them into the desired embedding
-            dimension in a single step.
-        </p> -->
+            In ViT, the image is split into fixed-size patches (e.g., 16×16 pixels) (Fig. 1.1).
+            Each patch is projected into an embedding vector of dimension <code>embed_dim</code> (Fig. 1.2). Typical ViT models use embedding sizes between 384 and 1024, this is just a design choice.
+            The 2D grid of patch embeddings is then reshaped into a 1D sequence of tokens using <code>flatten()</code> (Fig. 1.3) and that is then fed into the LLM-like transformer architecture (Fig. 1.4).
+        </p>
+        <figure id="fig1">
+            <svg viewBox="0 0 720 940" role="img" aria-labelledby="token-fig-title" style="width:100%;max-width:680px;height:auto;display:block;margin:0 auto;">
+                <title id="token-fig-title">Step 1: a 224×224 photo is split into 196 patches of 16×16 pixels. Step 2: each patch is turned into a 1D embedding vector of 512 numbers — one token. Step 3: the 14×14 grid of tokens is flattened into a 1D sequence of 196 tokens. Step 4: the sequence is fed into a transformer.</title>
+                <defs>
+                    <pattern id="patch-grid" x="30" y="30" width="16" height="16" patternUnits="userSpaceOnUse">
+                        <path d="M16 0H0V16" fill="none" stroke="#fff" stroke-opacity="0.55" stroke-width="0.75"/>
+                    </pattern>
+                    <g id="token-col">
+                        <rect x="0" y="0" width="26" height="65" fill="var(--bg-alt, #f8f9fa)" stroke="var(--border, #e5e7eb)"/>
+                        <path d="M0 13h26 M0 26h26 M0 39h26 M0 52h26" stroke="var(--border, #e5e7eb)" fill="none"/>
+                    </g>
+                    <g id="token-mini">
+                        <rect x="0" y="0" width="24" height="50" fill="var(--bg-alt, #f8f9fa)" stroke="var(--border, #e5e7eb)"/>
+                        <path d="M0 10h24 M0 20h24 M0 30h24 M0 40h24" stroke="var(--border, #e5e7eb)" fill="none"/>
+                    </g>
+                    <pattern id="flat-grid" x="40" y="580" width="10" height="10" patternUnits="userSpaceOnUse">
+                        <path d="M10 0H0V10" fill="none" stroke="var(--border, #e5e7eb)" stroke-width="0.75"/>
+                    </pattern>
+                </defs>
+
+                <!-- step 1: split the image into patches -->
+                <text x="16" y="18" font-size="13" font-weight="600" fill="var(--text, #1a1a1a)">1.1) The image is split into 16&#215;16 px patches</text>
+
+                <image href="images/token-embedding-crop.png" x="30" y="30" width="224" height="224"/>
+                <rect x="30" y="30" width="224" height="224" fill="url(#patch-grid)" stroke="var(--border, #e5e7eb)"/>
+                <rect x="94" y="126" width="16" height="16" fill="none" stroke="var(--accent, #2563eb)" stroke-width="2"/>
+                <text x="142" y="274" text-anchor="middle" font-size="12" fill="var(--text-secondary, #555)">224&#215;224 image</text>
+
+                <line x1="266" y1="142" x2="306" y2="142" stroke="var(--text-secondary, #555)" stroke-width="1.5"/>
+                <path d="M312 142l-8 -4.5v9z" fill="var(--text-secondary, #555)"/>
+
+                <image href="images/token-embedding-exploded.png" x="330" y="17" width="250" height="250"/>
+                <rect x="402" y="125" width="16" height="16" fill="none" stroke="var(--accent, #2563eb)" stroke-width="2"/>
+                <text x="455" y="286" text-anchor="middle" font-size="12" fill="var(--text-secondary, #555)">196 patches (14&#215;14 grid)</text>
+
+                <!-- step 2: each patch becomes a 1D vector -->
+                <text x="16" y="330" font-size="13" font-weight="600" fill="var(--text, #1a1a1a)">1.2) Each patch is turned into a 1D vector &#8211; a token</text>
+
+                <image href="images/token-embedding-patch.png" x="60" y="383" width="64" height="64" preserveAspectRatio="none" style="image-rendering:pixelated"/>
+                <rect x="60" y="383" width="64" height="64" fill="none" stroke="var(--accent, #2563eb)" stroke-width="2"/>
+                <text x="92" y="467" text-anchor="middle" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" fill="var(--text, #1a1a1a)">16&#215;16&#215;3</text>
+                <text x="92" y="482" text-anchor="middle" font-size="10" fill="var(--text-secondary, #555)">= 768 values (RGB)</text>
+
+                <line x1="132" y1="415" x2="170" y2="415" stroke="var(--text-secondary, #555)" stroke-width="1.5"/>
+                <path d="M176 415l-8 -4.5v9z" fill="var(--text-secondary, #555)"/>
+
+                <rect x="184" y="393" width="94" height="44" rx="6" fill="var(--accent, #2563eb)" fill-opacity="0.08" stroke="var(--accent, #2563eb)" stroke-width="1.5"/>
+                <text x="231" y="420" text-anchor="middle" font-size="13" font-weight="600" fill="var(--text, #1a1a1a)">Conv2d</text>
+                <text x="231" y="455" text-anchor="middle" font-size="10" fill="var(--text-secondary, #555)">kernel = 16</text>
+
+                <line x1="286" y1="415" x2="324" y2="415" stroke="var(--accent, #2563eb)" stroke-width="1.5"/>
+                <path d="M330 415l-8 -4.5v9z" fill="var(--accent, #2563eb)"/>
+
+                <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="var(--text, #1a1a1a)" text-anchor="middle">
+                    <rect x="338" y="350" width="58" height="26" fill="var(--bg-alt, #f8f9fa)" stroke="var(--border, #e5e7eb)"/>
+                    <text x="367" y="367">0.83</text>
+                    <rect x="338" y="376" width="58" height="26" fill="var(--bg-alt, #f8f9fa)" stroke="var(--border, #e5e7eb)"/>
+                    <text x="367" y="393">-1.24</text>
+                    <rect x="338" y="402" width="58" height="26" fill="var(--bg-alt, #f8f9fa)" stroke="var(--border, #e5e7eb)"/>
+                    <text x="367" y="419">0.07</text>
+                    <rect x="338" y="428" width="58" height="26" fill="var(--bg-alt, #f8f9fa)" stroke="var(--border, #e5e7eb)"/>
+                    <text x="367" y="445">&#8942;</text>
+                    <rect x="338" y="454" width="58" height="26" fill="var(--bg-alt, #f8f9fa)" stroke="var(--border, #e5e7eb)"/>
+                    <text x="367" y="471">0.42</text>
+                </g>
+                <rect x="338" y="350" width="58" height="130" fill="none" stroke="var(--accent, #2563eb)" stroke-width="2"/>
+                <text x="367" y="498" text-anchor="middle" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" fill="var(--text, #1a1a1a)">512&#215;1</text>
+
+                <text x="412" y="403" font-size="13" font-weight="600" fill="var(--accent, #2563eb)">1 token</text>
+                <text x="412" y="421" font-size="13" fill="var(--text, #1a1a1a)">= embedding vector</text>
+                <text x="412" y="439" font-size="11" fill="var(--text-secondary, #555)">(embed_dim = 512)</text>
+
+                <text x="412" y="466" font-size="11" fill="var(--text-secondary, #555)">The same Conv2d processes</text>
+                <text x="412" y="480" font-size="11" fill="var(--text-secondary, #555)">all 196 patches &#8594; 196 tokens</text>
+
+                <!-- step 3: the 2D grid of tokens is flattened into a 1D sequence -->
+                <text x="16" y="560" font-size="13" font-weight="600" fill="var(--text, #1a1a1a)">1.3) The 2D grid of tokens is flattened into a 1D sequence</text>
+
+                <rect x="40" y="580" width="140" height="140" fill="var(--bg-alt, #f8f9fa)"/>
+                <rect x="40" y="580" width="140" height="140" fill="url(#flat-grid)" stroke="var(--border, #e5e7eb)"/>
+                <path d="M44 585 H168 A5 5 0 0 1 168 595 H48 A5 5 0 0 0 48 605 H164" fill="none" stroke="var(--accent, #2563eb)" stroke-width="1.2" stroke-opacity="0.7"/>
+                <path d="M170 605l-8 -4.5v9z" fill="var(--accent, #2563eb)" fill-opacity="0.7"/>
+                <rect x="80" y="640" width="10" height="10" fill="var(--accent, #2563eb)" fill-opacity="0.3" stroke="var(--accent, #2563eb)" stroke-width="1.5"/>
+                <text x="110" y="742" text-anchor="middle" font-size="11" fill="var(--text-secondary, #555)">14&#215;14 grid of tokens (14, 14, 512)</text>
+                <text x="110" y="757" text-anchor="middle" font-size="11" fill="var(--text-secondary, #555)">each cell = one 512-dim vector</text>
+
+                <text x="225" y="636" text-anchor="middle" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" fill="var(--text, #1a1a1a)">flatten()</text>
+                <line x1="200" y1="650" x2="244" y2="650" stroke="var(--text-secondary, #555)" stroke-width="1.5"/>
+                <path d="M250 650l-8 -4.5v9z" fill="var(--text-secondary, #555)"/>
+
+                <use href="#token-mini" x="268" y="625"/>
+                <use href="#token-mini" x="298" y="625"/>
+                <use href="#token-mini" x="328" y="625"/>
+                <use href="#token-mini" x="358" y="625"/>
+                <use href="#token-mini" x="388" y="625"/>
+                <text x="432" y="655" text-anchor="middle" font-size="13" fill="var(--text-secondary, #555)">&#8230;</text>
+                <use href="#token-mini" x="452" y="625"/>
+                <rect x="452" y="625" width="24" height="50" fill="var(--accent, #2563eb)" fill-opacity="0.15" stroke="var(--accent, #2563eb)" stroke-width="2"/>
+                <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7" fill="var(--text, #1a1a1a)" text-anchor="middle">
+                    <text x="464" y="633">0.8</text>
+                    <text x="464" y="643">-1.2</text>
+                    <text x="464" y="653">0.1</text>
+                    <text x="464" y="663">&#8942;</text>
+                    <text x="464" y="673">0.4</text>
+                </g>
+                <text x="496" y="655" text-anchor="middle" font-size="13" fill="var(--text-secondary, #555)">&#8230;</text>
+                <use href="#token-mini" x="516" y="625"/>
+                <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" text-anchor="middle">
+                    <text x="280" y="691" fill="var(--text-secondary, #555)">0</text>
+                    <text x="464" y="691" fill="var(--accent, #2563eb)">88</text>
+                    <text x="528" y="691" fill="var(--text-secondary, #555)">195</text>
+                </g>
+                <text x="404" y="714" text-anchor="middle" font-size="11" fill="var(--text-secondary, #555)">1D sequence of 196 tokens (196, 512)</text>
+                <text x="404" y="729" text-anchor="middle" font-size="11" fill="var(--text-secondary, #555)">each token is still a 512-dim vector</text>
+
+                <!-- step 4: the token sequence goes into a transformer -->
+                <text x="16" y="800" font-size="13" font-weight="600" fill="var(--text, #1a1a1a)">1.4) The sequence of 1D tokens is fed into a transformer</text>
+
+                <use href="#token-col" x="40" y="820"/>
+                <use href="#token-col" x="72" y="820"/>
+                <use href="#token-col" x="104" y="820"/>
+                <rect x="104" y="820" width="26" height="65" fill="var(--accent, #2563eb)" fill-opacity="0.12" stroke="var(--accent, #2563eb)" stroke-width="2"/>
+                <use href="#token-col" x="136" y="820"/>
+                <text x="177" y="857" text-anchor="middle" font-size="13" fill="var(--text-secondary, #555)">&#8230;</text>
+                <use href="#token-col" x="192" y="820"/>
+                <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7" fill="var(--text, #1a1a1a)" text-anchor="middle">
+                    <text x="53" y="829">0.2</text>
+                    <text x="53" y="842">1.1</text>
+                    <text x="53" y="855">-0.5</text>
+                    <text x="53" y="868">&#8942;</text>
+                    <text x="53" y="881">0.9</text>
+                    <text x="85" y="829">-0.7</text>
+                    <text x="85" y="842">0.3</text>
+                    <text x="85" y="855">1.4</text>
+                    <text x="85" y="868">&#8942;</text>
+                    <text x="85" y="881">-0.2</text>
+                    <text x="117" y="829">0.8</text>
+                    <text x="117" y="842">-1.2</text>
+                    <text x="117" y="855">0.1</text>
+                    <text x="117" y="868">&#8942;</text>
+                    <text x="117" y="881">0.4</text>
+                    <text x="149" y="829">1.0</text>
+                    <text x="149" y="842">-0.4</text>
+                    <text x="149" y="855">0.6</text>
+                    <text x="149" y="868">&#8942;</text>
+                    <text x="149" y="881">0.3</text>
+                    <text x="205" y="829">0.5</text>
+                    <text x="205" y="842">-0.9</text>
+                    <text x="205" y="855">-0.1</text>
+                    <text x="205" y="868">&#8942;</text>
+                    <text x="205" y="881">1.2</text>
+                </g>
+                <text x="129" y="908" text-anchor="middle" font-size="11" fill="var(--text-secondary, #555)">196 tokens &#215; 512</text>
+
+                <line x1="230" y1="852" x2="266" y2="852" stroke="var(--text-secondary, #555)" stroke-width="1.5"/>
+                <path d="M272 852l-8 -4.5v9z" fill="var(--text-secondary, #555)"/>
+
+                <rect x="280" y="824" width="150" height="56" rx="6" fill="var(--accent, #2563eb)" fill-opacity="0.08" stroke="var(--accent, #2563eb)" stroke-width="1.5"/>
+                <text x="355" y="857" text-anchor="middle" font-size="13" font-weight="600" fill="var(--text, #1a1a1a)">Transformer</text>
+                <text x="355" y="902" text-anchor="middle" font-size="10" fill="var(--text-secondary, #555)">self-attention + MLP blocks</text>
+            </svg>
+            <figcaption>Figure 1: from image to transformer input. (1.1) A 224×224 crop of the astronaut test image is split into 14×14 = 196 non-overlapping patches of 16×16 px. (1.2) The convolution turns each patch (here: the eye) from 16×16×3 = 768 pixel values into a 1D embedding vector of <code>embed_dim</code> = 512 numbers &ndash; one token. (1.3) <code>flatten()</code> reads the 14×14 grid of tokens row by row into a sequence of 196 tokens &ndash; the eye token lands at position 6&#183;14 + 4 = 88 &ndash; and each token keeps its 512 numbers. (1.4) This (196, 512) sequence is what the transformer operates on. The values shown are illustrative.</figcaption>
+        </figure>
         <p>
-            In ViT, the image is split into fixed-size patches (e.g., 16×16 pixels).
-            Each patch is projected into an embedding vector of dimension <code>embed_dim</code>. Typical ViT models use embedding sizes between 384 and 1024, but this is a design choice.
-            The 2D grid of patch embeddings is then reshaped into a 1D sequence of tokens using <code>flatten()</code>.
-            
+            In practice, patch extraction (Fig. 1.1) and projection (Fig. 1.2) are implemented using a single convolution with kernel size and stride equal to the patch size. In PyTorch, the stride defaults to 1: the kernel shifts by one pixel at a time, so consecutive windows overlap almost entirely. Setting the stride equal to the kernel size instead makes each window start exactly where the previous one ended — which is precisely what we want: it patchifies the input image. This extracts non-overlapping patches and projects each 16×16 px patch to a single embedding vector in one step.
+
         </p>
 
-        <p>
-            In practice, patch extraction and projection can be implemented using
-            a convolution with kernel size and stride equal to the patch size.
-            This produces non-overlapping patches and projects them into the embedding dimension in one step, mapping each 16×16 px patch to a single embedding vector.
-        </p>
+        <pre><code class="language-python">import torch.nn as nn
 
-        <pre><code class="language-python">class PatchEmbedding(nn.Module):
+class PatchEmbedding(nn.Module):
     """Convert image into patch embeddings."""
 
     def __init__(self, patch_size, embed_dim):
         super().__init__()
-        self.proj = nn.Conv2d(
+        self.conv = nn.Conv2d(
             3, embed_dim, kernel_size=patch_size, stride=patch_size
         )
 
     def forward(self, x):
         # x: (batch, 3, H, W) -> (batch, embed_dim, H/P, W/P)
-        x = self.proj(x)
+        x = self.conv(x)
 
         # Flatten spatial dims and make channel last:
         # (batch, embed_dim, N) -> (batch, N, embed_dim)
@@ -109,8 +264,8 @@
         return x</code></pre>
 
         <p>
-            After flattening, the explicit 2D structure is removed.
-            The model now treats the image as a sequence of patch embeddings.
+            After flattening, the explicit 2D structure is removed (Fig. 1.3).
+            The model now treats the image as a sequence of patch embeddings (Fig. 1.4).
             For a 224×224 image with 16×16 patches, we obtain (224 / 16)² = 196 tokens.
         </p>
 
@@ -153,17 +308,17 @@
         return x</code></pre>
 
         <p>
-            The projections <code>self.q</code>, <code>self.k</code>, and <code>self.v</code> create query (Q), key (K), and value (V) vectors. Q, K, and V are simply different projections of the same input. V stores the information encoded in each patch and is passed to the next transformer block. Before being passed on, it is scaled by attention weights computed from Q and K. This is how tokens representing different parts of the image influence each other based on their content.
+            The projections <code>self.q</code>, <code>self.k</code>, and <code>self.v</code> create query (<code>q</code>), key (<code>k</code>), and value (<code>v</code>) vectors. <code>q</code>, <code>k</code>, and <code>v</code> are simply different projections of the same input. <code>v</code> stores the information encoded in each patch and is passed to the next transformer block. Before being passed on, it is scaled by attention weights computed from <code>q</code> and <code>k</code>. This is how tokens representing different parts of the image influence each other based on their content.
         </p>
         <p>
-            This framework allows the model to dynamically focus on different parts of the input image, enabling it to capture global context effectively by amplifying relevant features and suppressing less important ones. Specifically, it determines feature relevance through the interaction of Q and K, and accordingly adjusts the embedding information of each token in V that is passed to the next block, strengthening representations when Q and K match and weakening them when they do not.
+            This framework allows the model to dynamically focus on different parts of the input image, enabling it to capture global context effectively by amplifying relevant features and suppressing less important ones. Specifically, it determines feature relevance through the interaction of <code>q</code> and <code>k</code>, and accordingly adjusts the embedding information of each token in <code>v</code> that is passed to the next block, strengthening representations when <code>q</code> and <code>k</code> match and weakening them when they do not.
             
             The attention formula is:
         </p>
-        <pre class="math">Attention(Q, K, V) = softmax(QK<sup>T</sup> / &radic;d) &middot; V</pre>
+        <pre class="math">Attention(q, k, v) = softmax(qk<sup>T</sup> / &radic;d) &middot; v</pre>
 
         <p>
-            The dot product <math><msup><mi>QK</mi><mn>T</mn></msup></math>  produces similarity scores between tokens.
+            The dot product <math><msup><mi>qk</mi><mn>T</mn></msup></math>  produces similarity scores between tokens.
             The softmax normalizes across the key (token) dimension for each query.
             Scaling by √d stabilizes gradients when the embedding dimension grows.
         </p>
@@ -256,7 +411,7 @@ print(f"Output shape: {logits.shape}")</code></pre>
 
         <h3>Aggressive Spatial Compression at the Entry Point</h3>
 <p>
-        Each patch embedding collapses a 16×16 region of pixels into a single vector — all in one step. That's aggressive. You're throwing away a lot of spatial detail before the network has even started processing anything.
+        Each patch embedding collapses a 16×16 region of pixels into a single vector — all in one step. That's aggressive. The pixel count (16×16 = 768) roughly matches the embedding dimension (512), so little information is lost in principle — but the explicit spatial structure within each patch is gone, along with the convolutional inductive bias, before the network has even started processing anything.
 </p>
 <p>
         The original <a href="https://arxiv.org/pdf/2010.11929">ViT paper</a> actually acknowledged this. They proposed a Hybrid Architecture as an alternative: instead of that single brutal downsampling convolution, they used a pre-trained convolutional stem (a modified ResNet) to reduce spatial dimensions gradually. The idea is that a CNN is better at this early low-level processing than a raw patch projection.
@@ -273,7 +428,7 @@ print(f"Output shape: {logits.shape}")</code></pre>
         </p>
     
         <p>
-        CNNs typically start with small convolutions — 3×3 in EfficientNet, 7×7 in ResNet. Small kernels respond strongly to sharp local changes — edges — making them naturally high-pass. ViT's 16×16 patch convolution averages over a much larger region, making it more sensitive to low-frequency information — textures rather than edges. </p>
+        CNNs typically start with small convolutions — 3×3 in EfficientNet, 7×7 in ResNet. Small kernels respond strongly to sharp local changes — edges — making them naturally high-pass. ViT's 16×16 patch convolution averages over a much larger region, making it more sensitive to low-frequency information — global structure and shape rather than fine edges.</p>
 
         <p>
         This low-pass character isn't just a consequence of patchification. It's also built into self-attention itself, as shown in <a href="https://arxiv.org/pdf/2202.06709">How do Vision Transformers Work?</a>. It was further confirmed experimentally in this <a href="https://arxiv.org/pdf/2110.02797">study on adversarial robustness</a>. </p>
@@ -284,7 +439,7 @@ print(f"Output shape: {logits.shape}")</code></pre>
         <ul>
             <li><a href="https://arxiv.org/abs/2010.11929">Dosovitskiy et al., "An Image is Worth 16x16 Words" (2020)</a> &ndash; The original ViT paper</li>
             <li><a href="https://arxiv.org/abs/1706.03762">Vaswani et al., "Attention Is All You Need" (2017)</a> &ndash; The transformer architecture paper</li>
-            <li><a href="https://arxiv.org/pdf/2110.02797">Adversarial Robustness Comparison of Vision Transformer and MLP-Mixer to CNNs</a> &ndash; Patchification favours texture over edges</li>
+            <li><a href="https://arxiv.org/pdf/2110.02797">Adversarial Robustness Comparison of Vision Transformer and MLP-Mixer to CNNs</a> &ndash; ViTs rely on low-frequency information; robust to high-frequency perturbations</li>
             <li><a href="https://arxiv.org/pdf/2202.06709">How do Vision Transformers Work?</a> &ndash; additional insight into how ViT works</li>
         </ul>
 
