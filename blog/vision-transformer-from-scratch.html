@@ -277,7 +277,7 @@ class PatchEmbedding(nn.Module):
 
         <h2>Self-Attention</h2>
         <p>
-            Self-attention lets each patch effectively “look at” every other patch to gather context. It mixes information across spatial locations &ndash; acting as a <i>spatial mixer</i>.
+            Self-attention lets each patch effectively “look at” every other patch to gather context (Fig. 2). It mixes information across spatial locations &ndash; acting as a <i>spatial mixer</i>.
             For simplicity, we implement single-head scaled dot-product attention instead of the multi-head variant used in standard ViT models.
         </p>
 
@@ -308,7 +308,7 @@ class PatchEmbedding(nn.Module):
         return x</code></pre>
 
         <p>
-            The projections <code>self.q</code>, <code>self.k</code>, and <code>self.v</code> create query (<code>q</code>), key (<code>k</code>), and value (<code>v</code>) vectors. <code>q</code>, <code>k</code>, and <code>v</code> are simply different projections of the same input. <code>v</code> stores the information encoded in each patch and is passed to the next transformer block. Before being passed on, it is scaled by attention weights computed from <code>q</code> and <code>k</code>. This is how tokens representing different parts of the image influence each other based on their content.
+            The projections <code>self.q</code>, <code>self.k</code>, and <code>self.v</code> create query (<code>q</code>), key (<code>k</code>), and value (<code>v</code>) vectors. <code>q</code>, <code>k</code>, and <code>v</code> are simply different projections of the same input. <code>v</code> stores the information encoded in each patch and is passed to the next transformer block. Before being passed on, it is scaled by attention weights computed from <code>q</code> and <code>k</code> (Fig. 2.1). This is how tokens representing different parts of the image influence each other based on their content (Fig. 2.2).
         </p>
         <p>
             This framework allows the model to dynamically focus on different parts of the input image, enabling it to capture global context effectively by amplifying relevant features and suppressing less important ones. Specifically, it determines feature relevance through the interaction of <code>q</code> and <code>k</code>, and accordingly adjusts the embedding information of each token in <code>v</code> that is passed to the next block, strengthening representations when <code>q</code> and <code>k</code> match and weakening them when they do not.
@@ -319,9 +319,168 @@ class PatchEmbedding(nn.Module):
 
         <p>
             The dot product <math><msup><mi>qk</mi><mn>T</mn></msup></math>  produces similarity scores between tokens.
-            The softmax normalizes across the key (token) dimension for each query.
+            The softmax normalizes across the key (token) dimension for each query &ndash; every row of the attention matrix sums to 1 (Fig. 2.1).
+            The resulting weights then mix the value vectors into the output tokens (Fig. 2.2).
             Scaling by √d stabilizes gradients when the embedding dimension grows.
         </p>
+
+        <figure id="fig2">
+            <svg viewBox="0 0 720 480" role="img" aria-labelledby="attn-fig-title" style="width:100%;max-width:680px;height:auto;display:block;margin:0 auto;">
+                <title id="attn-fig-title">Self-attention for one token: the eye token's query is scored against every key, softmax over the key dimension turns each row of the attention matrix into weights, and the output token is the weighted sum of all value vectors.</title>
+                <defs>
+                    <pattern id="attn-grid" x="300" y="90" width="10" height="10" patternUnits="userSpaceOnUse">
+                        <path d="M10 0H0V10" fill="none" stroke="var(--border, #e5e7eb)" stroke-width="0.75"/>
+                    </pattern>
+                </defs>
+
+                <!-- 2.1: similarity scores between the query and all tokens -->
+                <text x="16" y="18" font-size="13" font-weight="600" fill="var(--text, #1a1a1a)">2.1) Each token scores its similarity with every other token</text>
+
+                <image href="images/token-embedding-crop.png" x="30" y="36" width="168" height="168"/>
+                <rect x="30" y="36" width="168" height="168" fill="none" stroke="var(--border, #e5e7eb)"/>
+                <line x1="84" y1="114" x2="120" y2="114" stroke="var(--accent, #2563eb)" stroke-width="2.2" stroke-opacity="0.9"/>
+                <line x1="84" y1="114" x2="108" y2="150" stroke="var(--accent, #2563eb)" stroke-width="1.8" stroke-opacity="0.75"/>
+                <line x1="84" y1="114" x2="180" y2="66" stroke="var(--accent, #2563eb)" stroke-width="0.8" stroke-opacity="0.35"/>
+                <rect x="78" y="108" width="12" height="12" fill="none" stroke="var(--accent, #2563eb)" stroke-width="2.5"/>
+                <rect x="114" y="108" width="12" height="12" fill="none" stroke="var(--accent, #2563eb)" stroke-width="1.5"/>
+                <rect x="102" y="144" width="12" height="12" fill="none" stroke="var(--accent, #2563eb)" stroke-width="1.5"/>
+                <rect x="174" y="60" width="12" height="12" fill="none" stroke="var(--accent, #2563eb)" stroke-width="1.5"/>
+                <g font-size="10" font-weight="600" fill="var(--accent, #2563eb)" stroke="#fff" stroke-width="2.5" paint-order="stroke" text-anchor="middle">
+                    <text x="84" y="103">query</text>
+                    <text x="136" y="106">0.30</text>
+                    <text x="124" y="154">0.20</text>
+                    <text x="186" y="56">0.01</text>
+                </g>
+                <text x="114" y="222" text-anchor="middle" font-size="11" fill="var(--text-secondary, #555)">the query patch is compared</text>
+                <text x="114" y="237" text-anchor="middle" font-size="11" fill="var(--text-secondary, #555)">with all 196 patches (3 shown)</text>
+
+                <text x="300" y="48" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" fill="var(--text, #1a1a1a)">attn = softmax(q &#183; k&#7488; / &#8730;d)</text>
+
+                <text x="345" y="84" text-anchor="middle" font-size="10" fill="var(--text-secondary, #555)">keys (k) &#8594;</text>
+                <text x="290" y="135" text-anchor="middle" font-size="10" fill="var(--text-secondary, #555)" transform="rotate(-90 290 135)">&#8592; queries (q)</text>
+                <rect x="300" y="90" width="90" height="90" fill="var(--bg-alt, #f8f9fa)"/>
+                <rect x="300" y="90" width="90" height="90" fill="url(#attn-grid)" stroke="var(--border, #e5e7eb)"/>
+                <rect x="300" y="130" width="90" height="10" fill="var(--accent, #2563eb)" fill-opacity="0.2" stroke="var(--accent, #2563eb)" stroke-width="1.5"/>
+                <text x="345" y="196" text-anchor="middle" font-size="10" fill="var(--text-secondary, #555)">attention matrix (196&#215;196)</text>
+                <text x="345" y="210" text-anchor="middle" font-size="10" fill="var(--text-secondary, #555)">softmax(dim=-1) normalizes each row</text>
+
+                <text x="412" y="127" text-anchor="middle" font-size="9" font-weight="600" fill="var(--accent, #2563eb)">eye row</text>
+                <line x1="396" y1="135" x2="425" y2="135" stroke="var(--accent, #2563eb)" stroke-width="1.5"/>
+                <path d="M431 135l-8 -4.5v9z" fill="var(--accent, #2563eb)"/>
+
+                <g transform="translate(20 0)">
+                <text x="440" y="70" font-size="11" fill="var(--text-secondary, #555)">attention weights for the eye query token:</text>
+
+                <line x1="448" y1="185" x2="448" y2="78" stroke="var(--text-secondary, #555)" stroke-width="1"/>
+                <path d="M448 72l-4 8h8z" fill="var(--text-secondary, #555)"/>
+                <text x="436" y="130" text-anchor="middle" font-size="10" fill="var(--text-secondary, #555)" transform="rotate(-90 436 130)">weight</text>
+                <line x1="448" y1="185" x2="655" y2="185" stroke="var(--text-secondary, #555)" stroke-width="1"/>
+                <path d="M661 185l-8 -4v8z" fill="var(--text-secondary, #555)"/>
+
+                <g fill="var(--accent, #2563eb)" fill-opacity="0.85">
+                    <rect x="462" y="87" width="26" height="98"/>
+                    <rect x="502" y="101" width="26" height="84"/>
+                    <rect x="542" y="129" width="26" height="56"/>
+                    <rect x="582" y="182" width="26" height="3"/>
+                    <rect x="622" y="146" width="26" height="39"/>
+                </g>
+                <g font-size="10" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" fill="var(--text, #1a1a1a)" text-anchor="middle">
+                    <text x="475" y="82">0.35</text>
+                    <text x="515" y="96">0.30</text>
+                    <text x="555" y="124">0.20</text>
+                    <text x="595" y="177">0.01</text>
+                    <text x="635" y="141">0.14</text>
+                </g>
+
+                <image href="images/token-embedding-patch.png" x="467" y="191" width="16" height="16" preserveAspectRatio="none" style="image-rendering:pixelated"/>
+                <image href="images/token-embedding-patch-eye2.png" x="507" y="191" width="16" height="16" preserveAspectRatio="none" style="image-rendering:pixelated"/>
+                <image href="images/token-embedding-patch-mouth.png" x="547" y="191" width="16" height="16" preserveAspectRatio="none" style="image-rendering:pixelated"/>
+                <image href="images/token-embedding-patch-bg.png" x="587" y="191" width="16" height="16" preserveAspectRatio="none" style="image-rendering:pixelated"/>
+                <text x="635" y="203" text-anchor="middle" font-size="11" fill="var(--text-secondary, #555)">&#8230;</text>
+                <g font-size="8" fill="var(--text-secondary, #555)" text-anchor="middle">
+                    <text x="475" y="219">itself</text>
+                    <text x="515" y="219">other eye</text>
+                    <text x="555" y="219">mouth</text>
+                    <text x="595" y="219">bg</text>
+                    <text x="635" y="219">192 more</text>
+                </g>
+                <text x="551" y="235" text-anchor="middle" font-size="10" fill="var(--text-secondary, #555)">keys (k) &#8594;</text>
+                <text x="551" y="251" text-anchor="middle" font-size="10" fill="var(--text-secondary, #555)">one query row (q = the eye) &ndash; weights sum to 1</text>
+                </g>
+
+                <!-- 2.2: output token = weighted sum of value vectors -->
+                <text x="16" y="286" font-size="13" font-weight="600" fill="var(--text, #1a1a1a)">2.2) The output token is the weighted sum of all value vectors</text>
+                <text x="16" y="306" font-size="10.5" fill="var(--text-secondary, #555)">each weight is the eye query&#8217;s attention to that key &ndash; one entry of the row from (2.1)</text>
+
+                <image href="images/token-embedding-patch.png" x="85" y="314" width="20" height="20" preserveAspectRatio="none" style="image-rendering:pixelated"/>
+                <image href="images/token-embedding-patch-eye2.png" x="211" y="314" width="20" height="20" preserveAspectRatio="none" style="image-rendering:pixelated"/>
+                <image href="images/token-embedding-patch-mouth.png" x="339" y="314" width="20" height="20" preserveAspectRatio="none" style="image-rendering:pixelated"/>
+
+                <g font-size="7" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" fill="var(--text-secondary, #555)" text-anchor="end">
+                    <text x="76" y="360">attn[eye, eye]</text>
+                    <text x="202" y="360">attn[eye, other]</text>
+                    <text x="330" y="360">attn[eye, mouth]</text>
+                </g>
+                <g font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" fill="var(--accent, #2563eb)" text-anchor="end">
+                    <text x="76" y="376">0.35 &#215;</text>
+                    <text x="202" y="376">0.30 &#215;</text>
+                    <text x="330" y="376">0.20 &#215;</text>
+                </g>
+                <use href="#token-col" x="82" y="338"/>
+                <use href="#token-col" x="208" y="338"/>
+                <use href="#token-col" x="336" y="338"/>
+                <g fill="var(--accent, #2563eb)" fill-opacity="0.15">
+                    <rect x="82" y="338" width="26" height="13"/>
+                    <rect x="208" y="338" width="26" height="13"/>
+                    <rect x="336" y="338" width="26" height="13"/>
+                    <rect x="420" y="338" width="26" height="13"/>
+                </g>
+                <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7" fill="var(--text, #1a1a1a)" text-anchor="middle">
+                    <text x="95" y="347">1.0</text>
+                    <text x="95" y="360">0.2</text>
+                    <text x="95" y="373">-0.4</text>
+                    <text x="95" y="386">&#8942;</text>
+                    <text x="95" y="399">0.6</text>
+                    <text x="221" y="347">0.6</text>
+                    <text x="221" y="360">-1.0</text>
+                    <text x="221" y="373">0.8</text>
+                    <text x="221" y="386">&#8942;</text>
+                    <text x="221" y="399">0.4</text>
+                    <text x="349" y="347">-0.5</text>
+                    <text x="349" y="360">0.4</text>
+                    <text x="349" y="373">1.0</text>
+                    <text x="349" y="386">&#8942;</text>
+                    <text x="349" y="399">0.2</text>
+                </g>
+                <g font-size="13" fill="var(--text, #1a1a1a)" text-anchor="middle">
+                    <text x="118" y="376">+</text>
+                    <text x="245" y="376">+</text>
+                    <text x="380" y="376">+ &#8230;</text>
+                    <text x="406" y="376">=</text>
+                </g>
+                <use href="#token-col" x="420" y="338"/>
+                <rect x="420" y="338" width="26" height="65" fill="var(--accent, #2563eb)" fill-opacity="0.12" stroke="var(--accent, #2563eb)" stroke-width="2"/>
+                <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="7" fill="var(--text, #1a1a1a)" text-anchor="middle">
+                    <text x="433" y="347">0.5</text>
+                    <text x="433" y="360">-0.2</text>
+                    <text x="433" y="373">0.3</text>
+                    <text x="433" y="386">&#8942;</text>
+                    <text x="433" y="399">0.4</text>
+                </g>
+                <g font-size="9" fill="var(--text-secondary, #555)" text-anchor="middle">
+                    <text x="95" y="418">v (eye)</text>
+                    <text x="221" y="418">v (other eye)</text>
+                    <text x="349" y="418">v (mouth)</text>
+                </g>
+                <text x="458" y="362" font-size="13" font-weight="600" fill="var(--accent, #2563eb)">new eye token</text>
+                <text x="458" y="380" font-size="12" fill="var(--text, #1a1a1a)">a content-aware mix</text>
+                <text x="458" y="398" font-size="11" fill="var(--text-secondary, #555)">(still 512-dim)</text>
+
+                <text x="250" y="442" text-anchor="middle" font-size="9.5" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" fill="var(--text, #1a1a1a)">first cell: 0.35&#183;1.0 + 0.30&#183;0.6 + 0.20&#183;(-0.5) + &#8230; = 0.5</text>
+                <text x="250" y="462" text-anchor="middle" font-size="11" fill="var(--text-secondary, #555)">the same weighted sum is computed for every token in parallel</text>
+            </svg>
+            <figcaption>Figure 2: self-attention for one token (the eye). (2.1) The eye token's query is compared with the key of every token; the scaled dot products pass through softmax, giving weights that sum to 1. Patches with similar content (the other eye, the mouth) score high, the background scores low. (2.2) Every token also carries a value vector (<code>v = self.v(x)</code>). The output for the eye token is the element-wise weighted sum of all 196 value vectors, where each weight is one entry of the eye query&#8217;s attention row from (2.1) &ndash; <code>attn[eye, key]</code> &ndash; and the highlighted first cells show one element of the sum. In code this is one row of <code>x = torch.matmul(attn, v)</code>: (196, 196) @ (196, 512) &#8594; (196, 512), where the shared key axis is summed away &ndash; so the same weighted sum runs for every token in parallel. The weights and values shown are illustrative.</figcaption>
+        </figure>
 
         <h2>Transformer Block</h2>
         <p>
@@ -411,7 +570,7 @@ print(f"Output shape: {logits.shape}")</code></pre>
 
         <h3>Aggressive Spatial Compression at the Entry Point</h3>
 <p>
-        Each patch embedding collapses a 16×16 region of pixels into a single vector — all in one step. That's aggressive. The pixel count (16×16 = 768) roughly matches the embedding dimension (512), so little information is lost in principle — but the explicit spatial structure within each patch is gone, along with the convolutional inductive bias, before the network has even started processing anything.
+        Each patch embedding collapses a 16×16×3 = 768-value region of pixels into a single 512-dim vector — a linear map, all in one step. That's aggressive: projecting 768 values down to 512 cannot be inverted, so it is lossy by construction. In practice the loss is mild, because natural image patches are highly redundant — neighbouring pixels are strongly correlated, so most of the variance lives in far fewer than 768 dimensions and the learned projection can keep what matters. What's unavoidable is that the explicit spatial structure within each patch, along with the convolutional inductive bias, is gone before the network has even started processing anything.
 </p>
 <p>
         The original <a href="https://arxiv.org/pdf/2010.11929">ViT paper</a> actually acknowledged this. They proposed a Hybrid Architecture as an alternative: instead of that single brutal downsampling convolution, they used a pre-trained convolutional stem (a modified ResNet) to reduce spatial dimensions gradually. The idea is that a CNN is better at this early low-level processing than a raw patch projection.
@@ -422,6 +581,9 @@ print(f"Output shape: {logits.shape}")</code></pre>
             <img src="images/vit-hybrid.jpeg" alt="ViT Hybrid Architecture diagram from the original paper">
         </figure>
 
+        <p>
+        The practical takeaway: if you are training a small ViT, it is worth also trying the hybrid variant — a CNN stem up front, a transformer on top. This is especially true when you do not have much data, since the convolutional stem brings back the inductive bias the raw patch projection throws away. On your own task, it is a cheap experiment that may well pay off.</p>
+
         <h3>ViT is low-pass filter</h3>
         <p>
         Vision Transformers behave as low-pass filters, while CNNs behave as high-pass filters.
@@ -431,7 +593,7 @@ print(f"Output shape: {logits.shape}")</code></pre>
         CNNs typically start with small convolutions — 3×3 in EfficientNet, 7×7 in ResNet. Small kernels respond strongly to sharp local changes — edges — making them naturally high-pass. ViT's 16×16 patch convolution averages over a much larger region, making it more sensitive to low-frequency information — global structure and shape rather than fine edges.</p>
 
         <p>
-        This low-pass character isn't just a consequence of patchification. It's also built into self-attention itself, as shown in <a href="https://arxiv.org/pdf/2202.06709">How do Vision Transformers Work?</a>. It was further confirmed experimentally in this <a href="https://arxiv.org/pdf/2110.02797">study on adversarial robustness</a>. </p>
+        This low-pass character isn't just a consequence of patchification. It's also built into self-attention itself, as shown in <a href="https://arxiv.org/pdf/2202.06709">How do Vision Transformers Work?</a>. It was further confirmed experimentally in this <a href="https://arxiv.org/pdf/2110.02797">study on adversarial robustness</a>, and again in my <a href="https://www.sciencedirect.com/science/article/pii/S1077314226001347">recent no-box attack (RINA)</a>, which perturbs the low-frequency, early-layer features. It degrades transformers more than convolutional models, and outperforms the high-frequency HIT attack precisely on those transformers — exactly what the low-pass-filter hypothesis predicts. </p>
 
         <h2>References</h2>
 
@@ -441,6 +603,7 @@ print(f"Output shape: {logits.shape}")</code></pre>
             <li><a href="https://arxiv.org/abs/1706.03762">Vaswani et al., "Attention Is All You Need" (2017)</a> &ndash; The transformer architecture paper</li>
             <li><a href="https://arxiv.org/pdf/2110.02797">Adversarial Robustness Comparison of Vision Transformer and MLP-Mixer to CNNs</a> &ndash; ViTs rely on low-frequency information; robust to high-frequency perturbations</li>
             <li><a href="https://arxiv.org/pdf/2202.06709">How do Vision Transformers Work?</a> &ndash; additional insight into how ViT works</li>
+            <li><a href="https://www.sciencedirect.com/science/article/pii/S1077314226001347">Dvořáček et al., "Resolution-invariant no-box attack" (2026)</a> &ndash; A no-box adversarial attack (RINA) that perturbs the low-frequency, early-layer features; it drops accuracy especially on transformer models, outperforming the high-frequency HIT attack &mdash; consistent with the low-pass-filter hypothesis</li>
         </ul>
 
         <h3>Production-ready implementations</h3>

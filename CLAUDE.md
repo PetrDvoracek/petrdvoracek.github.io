@@ -204,6 +204,21 @@ Static hosting (GitHub Pages, Netlify, Cloudflare Pages) - all free for static s
 
 ---
 
+## Blog figures
+
+* For concept demonstrations, use a real-world image, not an abstract schematic. Standard
+  choice: `skimage.data.astronaut()` (public domain). Do **not** use Lenna — it is
+  copyright-encumbered and deprecated by journals.
+* Crops used to illustrate patching must be exactly divisible by the patch size
+  (e.g., a 224×224 crop for 16×16 patches → 196 tokens, matching the article's numbers).
+* Build figures as inline SVG using the site's CSS variables (`--text`, `--accent`,
+  `--bg-alt`, `--border`) with light-theme fallbacks so they adapt to dark mode.
+  Embed photos via `<image>` referencing files in `blog/images/`.
+* Generated image assets live in `blog/images/`; keep the generating script's crop
+  coordinates in the figcaption or reproducible (crop origin, patch cell).
+
+---
+
 ## Blog post references section
 
 Structure the references section consistently:
