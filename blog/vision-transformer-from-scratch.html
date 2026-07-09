@@ -51,7 +51,7 @@
         <p class="meta">January 29, 2026</p>
 
         <p>
-            There are plenty of ViT implementations on GitHub &ndash; <a href="https://github.com/huggingface/pytorch-image-models/blob/main/timm/models/vision_transformer.py#L681">timm</a>, <a href="https://github.com/lucidrains/vit-pytorch/blob/main/vit_pytorch/vit.py#L85">lucidrains'</a>, and the <a href="https://github.com/google-research/vision_transformer/blob/main/vit_jax/models_vit.py#L211">reference code</a> from the paper, but these are complex and hard to follow.
+            There are plenty of ViT implementations on GitHub &ndash; <a href="https://github.com/huggingface/pytorch-image-models/blob/952cf84e3e75cb5567af4917077cf4fe3550b388/timm/models/vision_transformer.py#L711">timm</a>, <a href="https://github.com/lucidrains/vit-pytorch/blob/b4116d350b45830198125f5a19cc5173b4ccda32/vit_pytorch/vit.py#L85">lucidrains'</a>, and the <a href="https://github.com/google-research/vision_transformer/blob/c27af3e61245e9040ee27834d3e93e0ee2506301/vit_jax/models_vit.py#L211">reference code</a> from the paper, but these are complex and hard to follow.
             The basic idea is simpler than it looks. Below, I build a minimal ViT in ~80 lines of PyTorch to highlight the essentials. Patch embedding, for example, is just a simple convolutional layer.
             
         </p>
@@ -235,14 +235,15 @@
                 <text x="355" y="857" text-anchor="middle" font-size="13" font-weight="600" fill="var(--text, #1a1a1a)">Transformer</text>
                 <text x="355" y="902" text-anchor="middle" font-size="10" fill="var(--text-secondary, #555)">self-attention + MLP blocks</text>
             </svg>
-            <figcaption>Figure 1: from image to transformer input. (1.1) A 224×224 crop of the input image is split into 14×14 = 196 non-overlapping patches of 16×16 px. (1.2) The convolution turns each patch (here: the eye) from 16×16×3 = 768 pixel values into a 1D embedding vector of <code>embed_dim</code> = 512 numbers &ndash; one token. (1.3) <code>flatten()</code> reads the 14×14 grid of tokens row by row into a sequence of 196 tokens. The eye token lands at position 6&#183;14 + 4 = 88.</figcaption>
+            <figcaption>Figure 1: from image to transformer input. (1.1) A 224×224 crop of the input image is split into 14×14 = 196 non-overlapping patches of 16×16 px. (1.2) The convolution turns each patch (here: the eye) from 16×16×3 = 768 pixel values into a 1D embedding vector of <code>embed_dim</code> = 512 numbers &ndash; one token. (1.3) <code>flatten()</code> reads the 14×14 grid of tokens row by row into a sequence of 196 tokens. The eye token lands at position 6&#183;14 + 4 = 88. (1.4) The sequence of 196 tokens is fed into the transformer, just like a sequence of word embeddings in a language model.</figcaption>
         </figure>
         <p>
             In practice, patch extraction (Fig. 1.1) and projection (Fig. 1.2) are implemented using a single convolution with kernel size and stride equal to the patch size. In PyTorch, the stride defaults to 1: the kernel shifts by one pixel at a time, so consecutive windows overlap almost entirely. Setting the stride equal to the kernel size instead makes each window start exactly where the previous one ended — which is precisely what we want: it patchifies the input image. This extracts non-overlapping patches and projects each 16×16 px patch to a single embedding vector in one step.
 
         </p>
 
-        <pre><code class="language-python">import torch.nn as nn
+        <pre><code class="language-python">import torch
+import torch.nn as nn
 
 class PatchEmbedding(nn.Module):
     """Convert image into patch embeddings."""
@@ -564,7 +565,7 @@ print(f"Output shape: {logits.shape}")</code></pre>
         Each patch embedding collapses a 16×16×3 = 768-value region of pixels into a single 512-dim vector — a linear map, all in one step. That's aggressive: projecting 768 values down to 512 cannot be inverted, so it is lossy by construction. In practice the loss is mild, because natural image patches are highly redundant — neighbouring pixels are strongly correlated, so most of the variance lives in far fewer than 768 dimensions and the learned projection can keep what matters. What's unavoidable is that the explicit spatial structure within each patch, along with the convolutional inductive bias, is gone before the network has even started processing anything.
 </p>
 <p>
-        The original <a href="https://arxiv.org/pdf/2010.11929">ViT paper</a> actually acknowledged this. They proposed a Hybrid Architecture as an alternative: instead of that single brutal downsampling convolution, they used a pre-trained convolutional stem (a modified ResNet) to reduce spatial dimensions gradually. The idea is that a CNN is better at this early low-level processing than a raw patch projection.
+        The original <a href="https://arxiv.org/abs/2010.11929">ViT paper</a> actually acknowledged this. They proposed a Hybrid Architecture as an alternative: instead of that single brutal downsampling convolution, they used a convolutional stem (a modified ResNet, trained end-to-end with the transformer) to reduce spatial dimensions gradually. The idea is that a CNN is better at this early low-level processing than a raw patch projection.
 </p>
 <p>
         Does it help? Yes — but only at smaller model sizes. Figure 5 in the paper shows hybrids consistently outperform pure ViTs when the model is small. Once you scale up, the gap closes and the hybrid advantage disappears entirely. </p>
@@ -575,7 +576,7 @@ print(f"Output shape: {logits.shape}")</code></pre>
         <p>
         The practical takeaway: if you are training a small ViT, it is worth also trying the hybrid variant — a CNN stem up front, a transformer on top. This is especially true when you do not have much data, since the convolutional stem brings back the inductive bias the raw patch projection throws away. On your own task, it is a cheap experiment that may well pay off.</p>
 
-        <h3>ViT is low-pass filter</h3>
+        <h3>ViT Is a Low-Pass Filter</h3>
         <p>
         Vision Transformers behave as low-pass filters, while CNNs behave as high-pass filters.
         </p>
@@ -584,7 +585,7 @@ print(f"Output shape: {logits.shape}")</code></pre>
         CNNs typically start with small convolutions — 3×3 in EfficientNet, 7×7 in ResNet. Small kernels respond strongly to sharp local changes — edges — making them naturally high-pass. ViT's 16×16 patch convolution averages over a much larger region, making it more sensitive to low-frequency information — global structure and shape rather than fine edges.</p>
 
         <p>
-        This low-pass character isn't just a consequence of patchification. It's also built into self-attention itself, as shown in <a href="https://arxiv.org/pdf/2202.06709">How do Vision Transformers Work?</a>. It was further confirmed experimentally in this <a href="https://arxiv.org/pdf/2110.02797">study on adversarial robustness</a>, and again in my <a href="https://www.sciencedirect.com/science/article/pii/S1077314226001347">recent no-box attack (RINA)</a>, which perturbs the low-frequency, early-layer features. It degrades transformers more than convolutional models, and outperforms the high-frequency HIT attack precisely on those transformers — exactly what the low-pass-filter hypothesis predicts. </p>
+        This low-pass character isn't just a consequence of patchification. It's also built into self-attention itself, as shown in <a href="https://arxiv.org/abs/2202.06709">How do Vision Transformers Work?</a>. It was further confirmed experimentally in this <a href="https://arxiv.org/abs/2110.02797">study on adversarial robustness</a>, and again in my <a href="https://www.sciencedirect.com/science/article/pii/S1077314226001347">recent no-box attack (RINA)</a>, which perturbs the low-frequency, early-layer features. It degrades transformers more than convolutional models, and outperforms the high-frequency HIT attack precisely on those transformers — exactly what the low-pass-filter hypothesis predicts. </p>
 
         <h2>References</h2>
 
@@ -592,17 +593,17 @@ print(f"Output shape: {logits.shape}")</code></pre>
         <ul>
             <li><a href="https://arxiv.org/abs/2010.11929">Dosovitskiy et al., "An Image is Worth 16x16 Words" (2020)</a> &ndash; The original ViT paper</li>
             <li><a href="https://arxiv.org/abs/1706.03762">Vaswani et al., "Attention Is All You Need" (2017)</a> &ndash; The transformer architecture paper</li>
-            <li><a href="https://arxiv.org/pdf/2110.02797">Adversarial Robustness Comparison of Vision Transformer and MLP-Mixer to CNNs</a> &ndash; ViTs rely on low-frequency information; robust to high-frequency perturbations</li>
-            <li><a href="https://arxiv.org/pdf/2202.06709">How do Vision Transformers Work?</a> &ndash; additional insight into how ViT works</li>
+            <li><a href="https://arxiv.org/abs/2110.02797">Benz et al., "Adversarial Robustness Comparison of Vision Transformer and MLP-Mixer to CNNs" (2021)</a> &ndash; ViTs rely on low-frequency information; robust to high-frequency perturbations</li>
+            <li><a href="https://arxiv.org/abs/2202.06709">Park &amp; Kim, "How Do Vision Transformers Work?" (2022)</a> &ndash; additional insight into how ViT works</li>
             <li><a href="https://www.sciencedirect.com/science/article/pii/S1077314226001347">Dvořáček et al., "Resolution-invariant no-box attack" (2026)</a> &ndash; A no-box adversarial attack (RINA) that perturbs the low-frequency, early-layer features; it drops accuracy especially on transformer models, outperforming the high-frequency HIT attack &mdash; consistent with the low-pass-filter hypothesis</li>
         </ul>
 
         <h3>Production-ready implementations</h3>
         <p>These are the full-featured implementations mentioned in the introduction:</p>
         <ul>
-            <li><a href="https://github.com/huggingface/pytorch-image-models/blob/main/timm/models/vision_transformer.py#L681">timm</a> &ndash; PyTorch Image Models library by Hugging Face</li>
-            <li><a href="https://github.com/lucidrains/vit-pytorch/blob/main/vit_pytorch/vit.py#L85">vit-pytorch</a> &ndash; Clean PyTorch implementation by lucidrains</li>
-            <li><a href="https://github.com/google-research/vision_transformer/blob/main/vit_jax/models_vit.py#L211">vision_transformer</a> &ndash; Original JAX implementation by Google Research</li>
+            <li><a href="https://github.com/huggingface/pytorch-image-models/blob/952cf84e3e75cb5567af4917077cf4fe3550b388/timm/models/vision_transformer.py#L711">timm</a> &ndash; PyTorch Image Models library by Hugging Face</li>
+            <li><a href="https://github.com/lucidrains/vit-pytorch/blob/b4116d350b45830198125f5a19cc5173b4ccda32/vit_pytorch/vit.py#L85">vit-pytorch</a> &ndash; PyTorch implementation by lucidrains</li>
+            <li><a href="https://github.com/google-research/vision_transformer/blob/c27af3e61245e9040ee27834d3e93e0ee2506301/vit_jax/models_vit.py#L211">vision_transformer</a> &ndash; Original JAX implementation by Google Research</li>
         </ul>
 
     </article>
