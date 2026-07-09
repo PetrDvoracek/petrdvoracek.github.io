@@ -71,9 +71,8 @@
             In vision, tokens represent image patches (Fig. 1).
         </p>
         <p>
-            In ViT, the image is split into fixed-size patches (e.g., 16×16 pixels) (Fig. 1.1).
-            Each patch is projected into an embedding vector of dimension <code>embed_dim</code> (Fig. 1.2). Typical ViT models use embedding sizes between 384 and 1024, this is just a design choice.
-            The 2D grid of patch embeddings is then reshaped into a 1D sequence of tokens using <code>flatten()</code> (Fig. 1.3) and that is then fed into the LLM-like transformer architecture (Fig. 1.4).
+            Fig. 1.1 shows a 224×224 pixel (px) image split into 196 patches of 16×16 px.
+            Each patch is projected into an embedding vector of dimension <code>embed_dim</code> (Fig. 1.2). Typical ViT models use embedding sizes between 384 and 1024. This is just a design choice; we use a size of 512 in this example. The 2D grid of patch embeddings is then reshaped into a 1D sequence of tokens using <code>flatten()</code> (Fig. 1.3). In this setting, one 2D patch with 16×16 RGB pixels, containing 768 values in total, is turned into a 1D vector of size 512. These 1D vectors, each representing one patch in the image, are then fed as a sequence into the LLM-like transformer architecture (Fig. 1.4).
         </p>
         <figure id="fig1">
             <svg viewBox="0 0 720 940" role="img" aria-labelledby="token-fig-title" style="width:100%;max-width:680px;height:auto;display:block;margin:0 auto;">
@@ -141,7 +140,7 @@
                     <text x="367" y="471">0.42</text>
                 </g>
                 <rect x="338" y="350" width="58" height="130" fill="none" stroke="var(--accent, #2563eb)" stroke-width="2"/>
-                <text x="367" y="498" text-anchor="middle" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" fill="var(--text, #1a1a1a)">512&#215;1</text>
+                <text x="367" y="498" text-anchor="middle" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" fill="var(--text, #1a1a1a)">512 values</text>
 
                 <text x="412" y="403" font-size="13" font-weight="600" fill="var(--accent, #2563eb)">1 token</text>
                 <text x="412" y="421" font-size="13" fill="var(--text, #1a1a1a)">= embedding vector</text>
@@ -236,7 +235,7 @@
                 <text x="355" y="857" text-anchor="middle" font-size="13" font-weight="600" fill="var(--text, #1a1a1a)">Transformer</text>
                 <text x="355" y="902" text-anchor="middle" font-size="10" fill="var(--text-secondary, #555)">self-attention + MLP blocks</text>
             </svg>
-            <figcaption>Figure 1: from image to transformer input. (1.1) A 224×224 crop of the astronaut test image is split into 14×14 = 196 non-overlapping patches of 16×16 px. (1.2) The convolution turns each patch (here: the eye) from 16×16×3 = 768 pixel values into a 1D embedding vector of <code>embed_dim</code> = 512 numbers &ndash; one token. (1.3) <code>flatten()</code> reads the 14×14 grid of tokens row by row into a sequence of 196 tokens &ndash; the eye token lands at position 6&#183;14 + 4 = 88 &ndash; and each token keeps its 512 numbers. (1.4) This (196, 512) sequence is what the transformer operates on. The values shown are illustrative.</figcaption>
+            <figcaption>Figure 1: from image to transformer input. (1.1) A 224×224 crop of the input image is split into 14×14 = 196 non-overlapping patches of 16×16 px. (1.2) The convolution turns each patch (here: the eye) from 16×16×3 = 768 pixel values into a 1D embedding vector of <code>embed_dim</code> = 512 numbers &ndash; one token. (1.3) <code>flatten()</code> reads the 14×14 grid of tokens row by row into a sequence of 196 tokens. The eye token lands at position 6&#183;14 + 4 = 88.</figcaption>
         </figure>
         <p>
             In practice, patch extraction (Fig. 1.1) and projection (Fig. 1.2) are implemented using a single convolution with kernel size and stride equal to the patch size. In PyTorch, the stride defaults to 1: the kernel shifts by one pixel at a time, so consecutive windows overlap almost entirely. Setting the stride equal to the kernel size instead makes each window start exactly where the previous one ended — which is precisely what we want: it patchifies the input image. This extracts non-overlapping patches and projects each 16×16 px patch to a single embedding vector in one step.
@@ -264,15 +263,7 @@ class PatchEmbedding(nn.Module):
         return x</code></pre>
 
         <p>
-            After flattening, the explicit 2D structure is removed (Fig. 1.3).
-            The model now treats the image as a sequence of patch embeddings (Fig. 1.4).
-            For a 224×224 image with 16×16 patches, we obtain (224 / 16)² = 196 tokens.
-        </p>
-
-        <p>
-            Note that without positional embeddings (which we omit here),
-            the transformer has no explicit information about spatial ordering.
-            This limits performance but simplifies the example.
+            Note that because we removed the explicit 2D structure, the transformer has no explicit information about the spatial ordering of the tokens. It does not know which tokens map to patches that are next to each other in the image. This is solved by adding positional embeddings, but we omit that in this example just to keep it short and simple.
         </p>
 
         <h2>Self-Attention</h2>
